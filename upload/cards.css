@@ -1,0 +1,262 @@
+/* css/cards.css */
+
+/* ==========================================
+   1. CARD CONTAINER
+   ========================================== */
+.lotto-card {
+    background-color: #101e3f;
+    border: 1px solid #1e293b;
+    border-radius: 1.5rem;
+    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+    transition: all 0.3s ease;
+    width: 100%; 
+    overflow: hidden; 
+}
+
+.lotto-card:hover {
+    transform: scale(1.01);
+}
+
+.lotto-card__header {
+    display: flex;
+    align-items: center; /* Vertically center items */
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(30, 41, 59, 0.5);
+    padding: 1rem;
+    gap: 0.5rem;
+}
+
+.lotto-card__body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem; 
+    padding: 1.25rem;
+    flex-wrap: wrap;
+}
+
+/* ==========================================
+   2. MOBILE OPTIMIZATION (One Line Header)
+   ========================================== */
+@media (max-width: 480px) {
+    .lotto-card__header {
+        padding: 0.75rem;
+        /* KEEP flex-row to prevent stacking */
+        flex-direction: row; 
+        flex-wrap: nowrap; /* Prevent wrapping to next line */
+    }
+
+    /* Shrink text slightly to fit one line */
+    .lotto-card__header h3 {
+        font-size: 0.9rem; 
+    }
+    
+    .lotto-card__header span.mt-1 { /* Date */
+        font-size: 0.65rem;
+    }
+
+    .lotto-card__header .text-yellow-500 { /* Prize */
+        font-size: 0.75rem;
+    }
+}
+
+/* ==========================================
+   3. BALLS
+   ========================================== */
+.lotto-ball {
+    display: flex;
+    height: 2.75rem;
+    width: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    font-size: 1.125rem;
+    font-weight: 900;
+    box-shadow: 0 0 0 2px #334155;
+    transition: all 0.15s ease;
+    background: linear-gradient(to bottom right, #ffffff, #9ec4ead9);
+    color: #0f172a;
+    flex-shrink: 0; 
+}
+
+.lotto-ball--hot {
+    background: linear-gradient(135deg, #f97316, #ea580c);
+    color: white;
+    box-shadow: 0 0 15px rgba(249, 115, 22, 0.4), 0 0 0 2px #fdba74;
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    cursor: pointer;
+    position: relative;
+    z-index: 1; 
+}
+
+.lotto-ball--hot:hover {
+    transform: scale(1.1);
+}
+
+/* Mobile: Make balls smaller */
+@media (max-width: 480px) {
+    .lotto-ball {
+        height: 2.25rem; 
+        width: 2.25rem;
+        font-size: 0.9rem;
+    }
+}
+
+/* ==========================================
+   4. TOOLTIP
+   ========================================== */
+.tooltip-wrapper {
+    position: relative;
+    cursor: pointer;
+}
+
+.tooltip-box {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 0.5rem;
+    width: 14rem; 
+    max-width: 90vw; 
+    
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s, visibility 0.2s;
+    z-index: 50;
+    pointer-events: none;
+}
+
+.tooltip-wrapper:hover .tooltip-box {
+    opacity: 1;
+    visibility: visible;
+}
+
+.tooltip-content {
+    background-color: #020617;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+}
+
+.tooltip-arrow {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid #020617;
+}
+
+/* ==========================================
+   5. GROUPED CARD (2D/3D) - FLUID LAYOUT
+   ========================================== */
+.grouped-card-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid rgba(30, 41, 59, 0.2);
+    width: 100%;
+}
+
+.grouped-card-row:last-child {
+    border-bottom: none;
+}
+
+.grouped-card-row:hover {
+    background: rgba(30, 41, 59, 0.4);
+}
+
+/* Time Column */
+.grouped-card-time {
+    width: 60px; 
+    flex-shrink: 0;
+    text-align: left;
+    font-size: 1rem;
+    font-weight: 800;
+    color: #38bdf8;
+    text-transform: uppercase;
+}
+
+/* Balls Column */
+.grouped-card-balls {
+    flex-grow: 1; 
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0 0.5rem;
+}
+
+/* Winners Column */
+.grouped-card-winners {
+    width: 60px; 
+    flex-shrink: 0;
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+/* Mobile Adjustments for Grouped Rows */
+@media (max-width: 480px) {
+    .grouped-card-row {
+        padding: 0.75rem;
+    }
+    .grouped-card-time, .grouped-card-winners {
+        font-size: 0.875rem; 
+        width: 50px; 
+    }
+    .grouped-card-balls {
+        gap: 0.25rem; 
+    }
+}
+
+/* ==========================================
+   6. ANIMATIONS
+   ========================================== */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .7; }
+}
+
+/* ==========================================
+   2. MOBILE OPTIMIZATION
+   ========================================== */
+
+/* MAJOR CARDS (Default Behavior) */
+@media (max-width: 480px) {
+    .lotto-card__header {
+        padding: 0.75rem;
+        /* Allow wrapping for Major Cards (Title stacks above Prize) */
+        flex-wrap: wrap; 
+    }
+}
+
+/* DIGIT CARDS (One Line Behavior) */
+@media (max-width: 480px) {
+    /* Target only Digit Cards */
+    .lotto-card--digit .lotto-card__header {
+        /* Force one line for Digit Cards */
+        flex-direction: row; 
+        flex-wrap: nowrap;
+        align-items: center;
+    }
+
+    /* Shrink text slightly only for Digit Cards */
+    .lotto-card--digit .lotto-card__header h3 {
+        font-size: 0.9rem; 
+    }
+    
+    .lotto-card--digit .lotto-card__header span.mt-1 { /* Date */
+        font-size: 0.65rem;
+    }
+
+    .lotto-card--digit .lotto-card__header .text-yellow-500 { /* Prize */
+        font-size: 0.75rem;
+    }
+}

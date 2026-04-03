@@ -1,0 +1,104 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { publishToFacebookWithBuffer } from '@/lib/publish/meta';
+
+/**
+ * POST /api/publish/facebook
+ *
+ * Publishes a banner image with caption to a Facebook Page.
+ * Accepts base64-encoded image data and uploads via multipart form data.
+ *
+ * Body:
+ *   pageId: string       — Facebook Page ID
+ *   caption: string      — Post caption / message
+ *   imageBase64: string  — Base64-encoded image (with or without data URI prefix)
+ *   fileName?: string    — Image filename (default: banner.png)
+ *
+ * Environment:
+ *   META_ACCESS_TOKEN    — Long-lived Facebook Page access token
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { pageId, caption, imageBase64, fileName } = body as {
+      pageId?: string;
+      caption?: string;
+      imageBase64?: string;
+      fileName?: string;
+    };
+
+    // Validate required fields
+    if (!pageId || !caption || !imageBase64) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Missing required fields. Please provide pageId, caption, and imageBase64.',
+        },
+        { status: 400 },
+      );
+    }
+
+    // Check for access token
+    const accessToken = process.env.META_ACCESS_TOKEN;
+    if (!accessToken) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Facebook access token not configured. Add META_ACCESS_TOKEN to your .env.local file. ' +
+            'You can get a long-lived page token from the Meta for Developers dashboard.',
+        },
+        { status: 500 },
+      );
+    }
+
+    // Convert base64 to buffer
+    const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(cleanBase64, 'base64');
+
+    // Determine MIME type from data URI prefix or default to PNG
+    let mimeType = 'image/png';
+    const mimeMatch = imageBase64.match(/^data:(image\/\w+);base64,/);
+    if (mimeMatch) {
+      mimeType = mimeMatch[1];
+    }
+
+    const name = fileName || 'banner.png';
+
+    // Publish to Facebook
+    const result = await publishToFacebookWithBuffer({
+      pageAccessToken: accessToken,
+      pageId,
+      imageBuffer,
+      fileName: name,
+      mimeType,
+      caption,
+    });
+
+    if (!result.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: result.error || 'Failed to publish to Facebook.',
+        },
+        { status: 400 },
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      postId: result.postId,
+      postUrl: result.postUrl,
+      platform: 'facebook',
+      accountName: pageId,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'An unexpected error occurred';
+    return NextResponse.json(
+      {
+        success: false,
+        error: `Server error: ${message}`,
+      },
+      { status: 500 },
+    );
+  }
+}
