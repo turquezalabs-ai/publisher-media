@@ -88,8 +88,20 @@ const PLATFORM_CONFIG: Record<Platform, { icon: string; label: string; color: st
 // ==========================================
 // DEMO ACCOUNTS
 // ==========================================
-// No demo accounts — user adds their own real accounts
-const DEMO_ACCOUNTS: SocialAccount[] = [];
+const DEMO_ACCOUNTS: SocialAccount[] = [
+  { id: 'fb-1', platform: 'facebook', name: 'Lottong Pinoy Main', accountId: '100001', connected: true, isDemo: true },
+  { id: 'fb-2', platform: 'facebook', name: 'Lottong Pinoy Tips', accountId: '100002', connected: true, isDemo: true },
+  { id: 'fb-3', platform: 'facebook', name: 'Pinoy Lotto Daily', accountId: '100003', connected: true, isDemo: true },
+  { id: 'fb-4', platform: 'facebook', name: 'Lotto Results PH', accountId: '100004', connected: true, isDemo: true },
+  { id: 'fb-5', platform: 'facebook', name: 'Pinoy Numbers Hub', accountId: '100005', connected: false, isDemo: true },
+  { id: 'ig-1', platform: 'instagram', name: '@lottongpinoy', accountId: '200001', igUserId: '17841400123456789', connected: true, isDemo: true },
+  { id: 'ig-2', platform: 'instagram', name: '@lottongpinoytips', accountId: '200002', igUserId: '17841400987654321', connected: true, isDemo: true },
+  { id: 'ig-3', platform: 'instagram', name: '@pinoyswerto', accountId: '200003', connected: false, isDemo: true },
+  { id: 'tw-1', platform: 'twitter', name: '@LottongPinoy', accountId: '300001', connected: true, isDemo: true },
+  { id: 'tw-2', platform: 'twitter', name: '@PinoyLottoDaily', accountId: '300002', connected: true, isDemo: true },
+  { id: 'tw-3', platform: 'twitter', name: '@LottoResultsPH', accountId: '300003', connected: false, isDemo: true },
+  { id: 'tt-1', platform: 'tiktok', name: '@lottongpinoy', accountId: '400001', connected: false, isDemo: true },
+];
 
 // ==========================================
 // CAPTION GENERATION

@@ -28,7 +28,7 @@ import {
 } from '@/lib/banner/config';
 import type { LottoResult, BlueprintNumber, NumberData } from '@/lib/banner/types';
 import {
-  generateBlueprintCaption,
+  generateBlueprintCaptionV2,
   generateAnalysisCaption,
   getBlueprintCaptionCount,
   getAnalysisCaptionCount,
@@ -73,6 +73,9 @@ interface PublishPanelProps {
   analysisGameData: LottoResult[];
   analysisDate: string;
   captureBannerRef?: React.RefObject<HTMLDivElement | null>;
+  captureAnalysisRef?: React.RefObject<HTMLDivElement | null>;
+  onBlueprintGameChange?: (game: string) => void;
+  onAnalysisGameChange?: (game: string) => void;
 }
 
 // ==========================================
@@ -103,7 +106,7 @@ function buildCaption(
   gameData?: LottoResult[],
 ): string {
   if (bannerType === 'blueprint') {
-    return generateBlueprintCaption(blueprintDay, gameName);
+    return generateBlueprintCaptionV2(blueprintDay, game);
   }
 
   if (draw && gameData) {
@@ -134,6 +137,9 @@ export default function PublishPanel({
   analysisGameData,
   analysisDate,
   captureBannerRef,
+  captureAnalysisRef,
+  onBlueprintGameChange,
+  onAnalysisGameChange,
 }: PublishPanelProps) {
   // ---- State ----
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
@@ -159,6 +165,19 @@ export default function PublishPanel({
 
   // Ref for the preview's inner div (full 1080x1350 banner for capture)
   const publishPreviewRef = useRef<HTMLDivElement>(null);
+
+  // Game options (mirrored from page.tsx)
+  const gameOptions = [
+    { value: '6/58', label: 'Ultra Lotto 6/58' },
+    { value: '6/55', label: 'Grand Lotto 6/55' },
+    { value: '6/49', label: 'Super Lotto 6/49' },
+    { value: '6/45', label: 'Mega Lotto 6/45' },
+    { value: '6/42', label: 'Lotto 6/42' },
+    { value: '6D', label: '6D Lotto' },
+    { value: '4D', label: '4D Lotto' },
+    { value: '3D', label: '3D Swertres' },
+    { value: '2D', label: '2D EZ2' },
+  ];
 
   // ---- Load accounts from localStorage on mount ----
   useEffect(() => {
@@ -272,9 +291,18 @@ export default function PublishPanel({
     });
   };
 
+  // ---- Handle game change from Publish panel ----
+  const handlePublishGameChange = (newGame: string) => {
+    if (bannerType === 'blueprint' && onBlueprintGameChange) {
+      onBlueprintGameChange(newGame);
+    } else if (bannerType === 'analysis' && onAnalysisGameChange) {
+      onAnalysisGameChange(newGame);
+    }
+  };
+
   // ---- Capture the banner as base64 ----
   const captureBannerAsBase64 = useCallback(async (): Promise<string | null> => {
-    const refToCapture = captureBannerRef?.current || publishPreviewRef.current;
+    const refToCapture = captureBannerRef?.current || captureAnalysisRef?.current || publishPreviewRef.current;
     if (!refToCapture) {
       return null;
     }
@@ -291,7 +319,7 @@ export default function PublishPanel({
       console.error('Banner capture failed:', err);
       return null;
     }
-  }, [captureBannerRef]);
+  }, [captureBannerRef, captureAnalysisRef]);
 
   // ---- Publish via API ----
   const handlePublish = async () => {
@@ -402,13 +430,14 @@ export default function PublishPanel({
   // ---- Current banner data ----
   const currentGame = bannerType === 'blueprint' ? blueprintGame : analysisGame;
   const currentGameName = GAME_NAMES[currentGame] || currentGame;
+  const gameSelectorValue = currentGame;
 
   return (
     <div className="space-y-4">
       {/* ===== LEFT: CONTROLS ===== */}
       <div className="space-y-4">
 
-        {/* ---- Banner Type Selector ---- */}
+        {/* ---- Banner Type + Game Selector ---- */}
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader className="pb-3">
             <CardTitle className="text-white text-base">Publish Banner</CardTitle>
@@ -431,6 +460,27 @@ export default function PublishPanel({
               >
                 Analysis
               </Button>
+            </div>
+            {/* Game Selector — lets user pick game directly in Publish panel */}
+            <div>
+              <label className="text-gray-400 text-xs font-medium block mb-1.5">
+                Game: <span className="text-white font-bold">{currentGameName}</span>
+              </label>
+              <Select
+                value={gameSelectorValue}
+                onValueChange={handlePublishGameChange}
+              >
+                <SelectTrigger className="bg-gray-800 border-gray-700 text-white text-xs h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-800 border-gray-700">
+                  {gameOptions.map(g => (
+                    <SelectItem key={g.value} value={g.value} className="text-white focus:bg-gray-700 focus:text-white text-xs">
+                      {g.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <p className="text-gray-500 text-xs">
               {bannerType === 'blueprint'

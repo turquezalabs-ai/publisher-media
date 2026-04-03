@@ -26,29 +26,6 @@ import PublishPanel from '@/components/publish/PublishPanel';
 import { toPng } from 'html-to-image';
 import JSZip from 'jszip';
 
-// ==========================================
-// CLIENT-SIDE DATE PARSER (matches API route)
-// Handles MM/DD/YYYY (scraper) and YYYY-MM-DD
-// ==========================================
-function parseLottoDateClient(dateStr: string): Date | null {
-  if (!dateStr) return null;
-  const clean = String(dateStr).split(' ')[0];
-  const parts = clean.split(/[\/\-T]/);
-  if (parts.length >= 3) {
-    const p0 = parseInt(parts[0], 10);
-    const p1 = parseInt(parts[1], 10);
-    const p2raw = parts[2].split(/[^0-9]/)[0];
-    const p2 = parseInt(p2raw, 10);
-    if (isNaN(p0) || isNaN(p1) || isNaN(p2)) return null;
-    let year: number, month: number, day: number;
-    if (p0 > 100) { year = p0; month = p1; day = p2; }
-    else { month = p0; day = p1; year = p2 < 100 ? p2 + 2000 : p2; }
-    const d = new Date(year, month - 1, day);
-    return isNaN(d.getTime()) ? null : d;
-  }
-  return null;
-}
-
 export default function BannerStudio() {
   const [allData, setAllData] = useState<LottoResult[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,15 +109,13 @@ export default function BannerStudio() {
 
     const freqMap = calculateFrequency(gameData, analysisGame);
     const classified = classifyNumbers(freqMap);
-    const dateObj = parseLottoDateClient(latest.date);
-    const dateStr = dateObj
-      ? dateObj.toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        })
-      : latest.date;
+    const dateObj = new Date(latest.date.split(' ')[0]);
+    const dateStr = dateObj.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
 
     setAnalysisDraw(latest);
     setAnalysisDate(dateStr);
@@ -190,8 +165,7 @@ export default function BannerStudio() {
 
   const handleDownloadAnalysis = () => {
     if (!analysisDraw) return;
-    const d = parseLottoDateClient(analysisDraw.date);
-    const dateStr = d ? d.toISOString().split('T')[0] : analysisDraw.date.replace(/\//g, '-');
+    const dateStr = new Date(analysisDraw.date.split(' ')[0]).toISOString().split('T')[0];
     const name = GAME_NAMES[analysisGame].replace(/[\s/]/g, '-');
     handleDownloadSingle(captureAnalysisRef, `Analysis_${name}_${dateStr}.png`);
   };

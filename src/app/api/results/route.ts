@@ -7,6 +7,64 @@ let cachedData: unknown = null;
 let cacheTimestamp = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+// ==========================================
+// DATE PARSER (matches live site's parseDateSafe)
+// Handles MM/DD/YYYY (scraper) and YYYY-MM-DD formats
+// ==========================================
+function parseLottoDate(dateStr: string): number {
+  if (!dateStr) return 0;
+  const clean = String(dateStr).split(' ')[0]; // strip any trailing text
+  const parts = clean.split(/[\/\-T]/);
+  if (parts.length >= 3) {
+    const p0 = parseInt(parts[0], 10);
+    const p1 = parseInt(parts[1], 10);
+    const p2raw = parts[2].split(/[^0-9]/)[0]; // strip trailing chars
+    const p2 = parseInt(p2raw, 10);
+    if (isNaN(p0) || isNaN(p1) || isNaN(p2)) return 0;
+
+    let year: number, month: number, day: number;
+
+    if (p0 > 100) {
+      // YYYY-MM-DD format
+      year = p0; month = p1; day = p2;
+    } else {
+      // MM/DD/YYYY format (scraper output)
+      month = p0; day = p1; year = p2 < 100 ? p2 + 2000 : p2;
+    }
+
+    const d = new Date(year, month - 1, day);
+    return isNaN(d.getTime()) ? 0 : d.getTime();
+  }
+  return 0;
+}
+
+// ==========================================
+// COPYRIGHT TRAP DETECTION
+// ==========================================
+function isCopyrightTrap(entry: Record<string, unknown>): boolean {
+  const game = String(entry.game || '').toUpperCase();
+  const combo = String(entry.combination || '');
+  return (
+    game.includes('COPYRIGHT') ||
+    combo === 'THIS-DATA-IS-STOLEN'
+  );
+}
+
+// ==========================================
+// SORT & CLEAN DATA (newest first, no traps)
+// ==========================================
+function cleanAndSortData(data: unknown[]): unknown[] {
+  const cleaned = data.filter(
+    (entry) => !isCopyrightTrap(entry as Record<string, unknown>)
+  );
+  cleaned.sort((a, b) => {
+    const dateA = parseLottoDate((a as Record<string, unknown>).date as string);
+    const dateB = parseLottoDate((b as Record<string, unknown>).date as string);
+    return dateB - dateA; // newest first
+  });
+  return cleaned;
+}
+
 export async function GET() {
   try {
     // Check if external data source is configured
@@ -37,13 +95,14 @@ export async function GET() {
         return serveLocalFile();
       }
 
-      const data = await response.json();
+      const raw = await response.json();
 
-      // Cache the result
-      cachedData = data;
+      // Clean, sort, and cache
+      const cleaned = cleanAndSortData(raw as unknown[]);
+      cachedData = cleaned;
       cacheTimestamp = now;
 
-      return NextResponse.json(data);
+      return NextResponse.json(cleaned);
     }
 
     // ---- LOCAL MODE: serve from public/results.json ----
@@ -67,6 +126,7 @@ export async function GET() {
 function serveLocalFile() {
   const filePath = path.join(process.cwd(), 'public', 'results.json');
   const fileContents = fs.readFileSync(filePath, 'utf-8');
-  const data = JSON.parse(fileContents);
-  return NextResponse.json(data);
+  const raw = JSON.parse(fileContents);
+  const cleaned = cleanAndSortData(raw as unknown[]);
+  return NextResponse.json(cleaned);
 }
