@@ -368,7 +368,7 @@ function buildAnalysisSVG(
 }
 
 // ==========================================
-// DAILY WINNERS BANNER SVG (Figma Design)
+// DAILY WINNERS BANNER SVG (Exact Figma Layout)
 // ==========================================
 
 // Cache base64-encoded banner assets for embedding in SVG
@@ -391,25 +391,21 @@ function getQRBase64(): string {
   return _qrB64;
 }
 
-// Figma-specific solid colors for Daily Winners banner balls
-const FIGMA_BALL_COLORS: Record<string, string> = {
-  '6/58': '#1C47A8',
-  '6/55': '#0055A4',
-  '6/49': '#9F4B1B',
-  '6/45': '#7A6518',
-  '6/42': '#5C4E1A',
-  '6D':   '#068586',
-  '4D':   '#068586',
-  '3D':   '#5E2BA7',
-  '2D':   '#8A2332',
-};
-
 interface DailyDrawEntry {
   game: string;
   gameLabel: string;
   numbers: number[];
   timeSlot?: string; // '2PM', '5PM', '9PM' for digit games
 }
+
+// ==========================================
+// Exact Figma-to-SVG position mapping
+// All pixel positions extracted directly from
+// the Figma HTML export. CSS top → SVG y uses:
+//   svgY = cssTop + fontSize * 0.78
+// Numbers inside circles: centered at ball center
+//   numY = ballTop + 38 + 11 (for 32px font)
+// ==========================================
 
 function buildDailyWinnersSVG(
   dateStr: string,
@@ -422,205 +418,145 @@ function buildDailyWinnersSVG(
   const logoB64 = getLogoBase64();
   const qrB64 = getQRBase64();
 
-  // ---- LAYOUT CONSTANTS ----
-  const headerBottom = 310;  // Below header separator line
-  const footerTop = 1150;    // Above footer disclaimer
-  const contentTop = headerBottom + 15;
-  const contentBottom = footerTop - 15;
-  const availableHeight = contentBottom - contentTop;
+  // ---- FIGMA EXACT CONSTANTS ----
+  const BALL_SIZE = 76;           // 76x76 circles
+  const BALL_R = 38;              // radius
+  const MAJOR_BALL_LEFT = 472;    // first major ball left edge (Figma)
+  const MAJOR_BALL_GAP = 90;      // center-to-center for major balls
+  const DAILY_2D_BALL_LEFTS = [265, 359];   // 2D ball left edges (Figma)
+  const DAILY_3D_BALL_LEFTS = [709, 803, 897]; // 3D ball left edges (Figma)
+  const DAILY_BALL_GAP = 94;      // center-to-center for daily balls
+  const ROW_GAP = 94;             // major game row spacing (ball top to top)
+  const GAME_NAME_CENTER_X = 268; // center x for game names (between margin and balls)
 
-  // ---- MAJOR GAMES SIZING ----
-  const majorCount = majorDraws.length;
-  const majorSectionLabelH = 52;  // label + underline
-  const majorRowH = 88;
-  const majorRowGap = 10;
-  const majorTotalH = majorSectionLabelH + majorCount * majorRowH + (majorCount - 1) * majorRowGap;
+  // Fixed DAILY DRAWS section Y positions (CSS top values from Figma)
+  const DAILY_LABEL_TOP = 759;
+  const DAILY_COL_HEADER_TOP = 817;
+  const DAILY_SLOT_TOPS = [877, 971, 1065]; // 2PM, 5PM, 9PM ball tops
 
-  // ---- SEPARATOR ----
-  const separatorH = 30;
-
-  // ---- DAILY DRAWS SIZING ----
-  const dailySectionLabelH = 52;   // label + underline
-  const dailyColHeaderH = 38;      // "2D EZ2 Lotto" / "3D Swertres"
-  const dailySlotH = 82;
-  const dailySlotGap = 8;
-  const dailySlots = 3; // 2PM, 5PM, 9PM
-  const dailyTotalH = dailySectionLabelH + dailyColHeaderH + dailySlots * dailySlotH + (dailySlots - 1) * dailySlotGap;
-
-  // ---- VERTICAL CENTERING ----
-  const totalContentH = majorTotalH + separatorH + dailyTotalH;
-  let startY = contentTop + Math.max(0, (availableHeight - totalContentH) / 2);
-
-  // ---- BALL LAYOUT (Figma: ~73px diameter, 90px center-to-center) ----
-  const majorBallR = 36;
-  const majorBallSpacing = 90;
-
-  // ---- DAILY DRAWS LAYOUT ----
-  // 2D: maroon capsule pills (~70x56px)
-  const pillW = 70;
-  const pillH = 56;
-  const pillRx = 28;
-  const pillGap = 16;
-  // 3D: purple balls (~34px radius, 82px spacing)
-  const daily3DBallR = 34;
-  const daily3DBallSpacing = 82;
+  // ---- DYNAMIC MAJOR GAMES POSITIONING ----
+  // Center major games section between header (~y=260) and DAILY DRAWS label (y=759)
+  const N = majorDraws.length;
+  const majorContentH = 66 + Math.max(0, N - 1) * ROW_GAP + BALL_SIZE; // gap + rows + last ball
+  const spaceTop = 270;  // below date
+  const majorLabelTopCSS = spaceTop + (DAILY_LABEL_TOP - spaceTop - majorContentH) / 2;
+  const majorFirstRowTopCSS = majorLabelTopCSS + 66;
 
   let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
   svg += `<defs>`;
   svg += `<clipPath id="logo-clip"><circle cx="132" cy="132" r="68" /></clipPath>`;
-  svg += `<clipPath id="qr-clip"><rect x="880" y="64" width="136" height="136" rx="12" /></clipPath>`;
-  svg += `<linearGradient id="sep-grad" x1="0" y1="0" x2="1" y2="0">`;
-  svg += `<stop offset="0%" stop-color="rgba(255,255,255,0)" />`;
-  svg += `<stop offset="30%" stop-color="rgba(255,255,255,0.18)" />`;
-  svg += `<stop offset="50%" stop-color="rgba(255,255,255,0.28)" />`;
-  svg += `<stop offset="70%" stop-color="rgba(255,255,255,0.18)" />`;
-  svg += `<stop offset="100%" stop-color="rgba(255,255,255,0)" />`;
-  svg += `</linearGradient>`;
   svg += `</defs>`;
 
   // ---- BACKGROUND ----
-  svg += svgRect(0, 0, W, H, '#101E44');
+  svg += svgRect(0, 0, W, H, '#111E44');
 
   // ==========================================
   // HEADER (standard — same as all banners)
   // ==========================================
+  // Logo — circular clip with real image
   svg += `<circle cx="132" cy="132" r="68" fill="rgba(255,255,255,0.10)" />`;
   svg += `<image x="64" y="64" width="136" height="136" href="data:image/png;base64,${logoB64}" clip-path="url(#logo-clip)" preserveAspectRatio="xMidYMid slice" />`;
-  svg += `<rect x="880" y="64" width="136" height="136" rx="12" fill="rgba(255,255,255,0.90)" />`;
-  svg += `<image x="892" y="76" width="112" height="112" href="data:image/png;base64,${qrB64}" clip-path="url(#qr-clip)" preserveAspectRatio="xMidYMid slice" />`;
+
+  // QR code — NO border, NO background (raw image as-is)
+  svg += `<image x="880" y="64" width="136" height="136" href="data:image/png;base64,${qrB64}" />`;
+
+  // Brand: "Lottong" (white) + " Pinoy" (blue)
   svg += `<text x="420" y="158" text-anchor="middle" font-family="${FONT}" font-size="68" font-weight="800" fill="white">Lottong</text>`;
   svg += `<text x="612" y="158" text-anchor="start" font-family="${FONT}" font-size="68" font-weight="800" fill="#3B82F6"> Pinoy</text>`;
-  svg += svgText(540, 210, 'LOTTO DRAW RESULTS', { size: 22, weight: '700', color: 'rgba(255,255,255,0.40)', letterSpacing: 3.25 });
+
+  // Subtitle: "LOTTO DRAW RESULTS" (standard position)
+  svg += svgText(540, 206, 'LOTTO DRAW RESULTS', { size: 22, weight: '700', color: 'rgba(255,255,255,0.40)', letterSpacing: 3.25 });
+
+  // Date (standard position)
   svg += svgText(540, 244, dateStr, { size: 22, weight: '600', color: 'white', letterSpacing: 2.80 });
-  svg += svgText(540, 286, 'DAILY WINNERS', { size: 44, weight: '800', color: 'white', letterSpacing: 3 });
-  svg += `<line x1="64" y1="308" x2="1016" y2="308" stroke="rgba(255,255,255,0.12)" stroke-width="1" />`;
+
+  // NO "DAILY WINNERS" label — Figma goes straight to MAJOR GAMES
 
   // ==========================================
-  // MAJOR GAMES SECTION (Figma layout)
+  // MAJOR GAMES SECTION (exact Figma positions)
   // ==========================================
-  let curY = startY;
+  // "MAJOR GAMES" label — centered, light blue (#B3D0FF), size 32
+  const majorLabelSVG_Y = Math.round(majorLabelTopCSS + 32 * 0.78);
+  svg += svgText(540, majorLabelSVG_Y, 'MAJOR GAMES', { size: 32, weight: '700', color: '#B3D0FF', letterSpacing: 3.20 });
 
-  // Section label — centered, light blue
-  svg += svgText(540, curY + 18, 'MAJOR GAMES', { size: 20, weight: '700', color: '#93C5FD', letterSpacing: 4 });
-  svg += `<line x1="240" y1="${curY + 34}" x2="840" y2="${curY + 34}" stroke="url(#sep-grad)" stroke-width="1" />`;
-  curY += majorSectionLabelH;
-
-  for (let i = 0; i < majorDraws.length; i++) {
+  // Game rows
+  for (let i = 0; i < N; i++) {
     const entry = majorDraws[i];
     const nums = entry.numbers;
-    const rowCY = curY + majorRowH / 2;
+    const rowTopCSS = majorFirstRowTopCSS + i * ROW_GAP;
+    const centerY = rowTopCSS + BALL_R;  // ball center Y
+    const nameSVG_Y = Math.round(centerY + 12); // baseline for 34px text
+    const numSVG_Y = Math.round(centerY + 11);  // baseline for 32px text
 
-    // Game name — left aligned
-    svg += svgText(80, rowCY + 6, entry.gameLabel, { size: 22, weight: '700', color: 'white', anchor: 'start', letterSpacing: 1 });
+    // Game name — centered between left margin and ball area
+    svg += svgText(GAME_NAME_CENTER_X, nameSVG_Y, entry.gameLabel, {
+      size: 34, weight: '700', color: 'white',
+      anchor: 'middle', letterSpacing: 3.40,
+    });
 
-    // Pipe separator after game name
-    svg += svgText(420, rowCY + 6, '|', { size: 22, weight: '300', color: 'rgba(255,255,255,0.40)', anchor: 'start' });
-
-    // Number balls — positioned to the right of pipe
-    const ballColor = FIGMA_BALL_COLORS[entry.game] || '#1C47A8';
-    const totalBallsW = (nums.length - 1) * majorBallSpacing + majorBallR * 2;
-    const ballsAreaStart = 460;
-    const ballsAreaEnd = 1016;
-    const ballsAreaW = ballsAreaEnd - ballsAreaStart;
-    const ballsFirstCX = ballsAreaStart + (ballsAreaW - totalBallsW) / 2 + majorBallR;
-
+    // Number balls — always start at x=472 (Figma), 90px center-to-center
+    const ballColor = GAME_COLORS_HEX[entry.game] || 'rgba(37, 99, 235, 0.60)';
     for (let j = 0; j < nums.length; j++) {
-      const cx = ballsFirstCX + j * majorBallSpacing;
-      svg += svgCircle(cx, rowCY, majorBallR, ballColor, 'rgba(255,255,255,0.15)', 3);
+      const cx = MAJOR_BALL_LEFT + BALL_R + j * MAJOR_BALL_GAP;
+      svg += svgCircle(cx, centerY, BALL_R, ballColor, 'rgba(255,255,255,0.20)', 4);
       const numStr = nums[j] >= 10 ? String(nums[j]) : String(nums[j]).padStart(2, '0');
-      svg += svgText(cx, rowCY + 10, numStr, { size: 26, weight: '700', color: 'white' });
+      svg += svgText(cx, numSVG_Y, numStr, { size: 32, weight: '700', color: 'white' });
     }
-
-    // Row separator (except last)
-    if (i < majorDraws.length - 1) {
-      const sepY = curY + majorRowH + majorRowGap / 2;
-      svg += `<line x1="80" y1="${sepY}" x2="1016" y2="${sepY}" stroke="rgba(255,255,255,0.06)" stroke-width="1" />`;
-    }
-
-    curY += majorRowH + majorRowGap;
   }
 
-  // ---- GRADIENT SEPARATOR between Major and Daily ----
-  svg += `<line x1="140" y1="${curY + 10}" x2="940" y2="${curY + 10}" stroke="url(#sep-grad)" stroke-width="1" />`;
-  curY += separatorH;
-
   // ==========================================
-  // DAILY DRAWS SECTION (Figma layout)
+  // DAILY DRAWS SECTION (exact Figma positions)
   // ==========================================
-  // Section label — centered, light blue
-  svg += svgText(540, curY + 18, 'DAILY DRAWS', { size: 20, weight: '700', color: '#93C5FD', letterSpacing: 4 });
-  svg += `<line x1="240" y1="${curY + 34}" x2="840" y2="${curY + 34}" stroke="url(#sep-grad)" stroke-width="1" />`;
-  curY += dailySectionLabelH;
+  // "DAILY DRAWS" label — centered, light blue (#B3D0FF), size 32
+  const dailyLabelSVG_Y = Math.round(DAILY_LABEL_TOP + 32 * 0.78);
+  svg += svgText(540, dailyLabelSVG_Y, 'DAILY DRAWS', { size: 32, weight: '700', color: '#B3D0FF', letterSpacing: 3.20 });
 
-  // Column headers
-  svg += svgText(290, curY + 16, '2D EZ2 Lotto', { size: 18, weight: '700', color: 'rgba(255,255,255,0.50)', letterSpacing: 2 });
-  svg += svgText(780, curY + 16, '3D Swertres', { size: 18, weight: '700', color: 'rgba(255,255,255,0.50)', letterSpacing: 2 });
-  curY += dailyColHeaderH;
+  // Column headers: "2D EZ2 Lotto" at left=149, "3D Swertres" at left=584
+  const colHeaderSVG_Y = Math.round(DAILY_COL_HEADER_TOP + 30 * 0.78);
+  svg += svgText(149, colHeaderSVG_Y, '2D EZ2 Lotto', { size: 30, weight: '700', color: 'white', anchor: 'start', letterSpacing: 3 });
+  svg += svgText(584, colHeaderSVG_Y, '3D Swertres', { size: 30, weight: '700', color: 'white', anchor: 'start', letterSpacing: 3 });
 
   // Separate 2D and 3D entries by time slot
   const daily2D = dailyDraws.filter(d => d.game === '2D');
   const daily3D = dailyDraws.filter(d => d.game === '3D');
 
-  const dailySectionStart = curY;
-  const col2DCenter = 290;  // 2D column center
-  const col3DCenter = 780;  // 3D column center
+  for (let slot = 0; slot < 3; slot++) {
+    const ballTopY = DAILY_SLOT_TOPS[slot];
+    const centerY = ballTopY + BALL_R;
+    const numSVG_Y = Math.round(centerY + 11);
 
-  for (let slotIdx = 0; slotIdx < 3; slotIdx++) {
-    const slotY = curY + slotIdx * (dailySlotH + dailySlotGap);
-    const slotLabel = DAILY_DRAW_TIME_SLOTS[slotIdx];
-    const slotCY = slotY + dailySlotH / 2;
+    // Time labels — 2D side (left=149, size=26) and 3D side (left=583, size=30)
+    const time2D_Y = Math.round(ballTopY + 21 + 26 * 0.78);
+    const time3D_Y = Math.round(ballTopY + 21 + 30 * 0.78);
+    svg += svgText(149, time2D_Y, DAILY_DRAW_TIME_SLOTS[slot], { size: 26, weight: '700', color: 'white', anchor: 'start', letterSpacing: 2.60 });
+    svg += svgText(583, time3D_Y, DAILY_DRAW_TIME_SLOTS[slot], { size: 30, weight: '700', color: 'white', anchor: 'start', letterSpacing: 3 });
 
-    // Time label — left side
-    svg += svgText(80, slotCY + 6, slotLabel, { size: 22, weight: '700', color: 'white', anchor: 'start', letterSpacing: 2 });
-
-    // ---- 2D (maroon capsule pills) ----
-    if (daily2D[slotIdx]) {
-      const nums2d = daily2D[slotIdx].numbers;
-      const totalPillW = nums2d.length * pillW + (nums2d.length - 1) * pillGap;
-      const pillStartX = col2DCenter - totalPillW / 2;
-
-      for (let j = 0; j < nums2d.length; j++) {
-        const px = pillStartX + j * (pillW + pillGap);
-        const py = slotCY - pillH / 2;
-        svg += svgRect(px, py, pillW, pillH, '#8A2332', pillRx);
-        const numStr = nums2d[j] >= 10 ? String(nums2d[j]) : String(nums2d[j]).padStart(2, '0');
-        svg += svgText(px + pillW / 2, py + pillH / 2 + 10, numStr, { size: 24, weight: '700', color: 'white' });
+    // 2D balls — circles at x=265, 359 (Figma)
+    if (daily2D[slot]) {
+      const nums = daily2D[slot].numbers;
+      for (let j = 0; j < Math.min(nums.length, 2); j++) {
+        const cx = DAILY_2D_BALL_LEFTS[j] + BALL_R;
+        svg += svgCircle(cx, centerY, BALL_R, 'rgba(220, 38, 38, 0.60)', 'rgba(255,255,255,0.20)', 4);
+        const numStr = nums[j] >= 10 ? String(nums[j]) : String(nums[j]).padStart(2, '0');
+        svg += svgText(cx, numSVG_Y, numStr, { size: 32, weight: '700', color: 'white' });
       }
-    } else {
-      svg += svgText(col2DCenter, slotCY + 6, '—', { size: 24, weight: '400', color: 'rgba(255,255,255,0.20)' });
     }
 
-    // ---- 3D (purple circles) ----
-    if (daily3D[slotIdx]) {
-      const nums3d = daily3D[slotIdx].numbers;
-      const totalW3d = (nums3d.length - 1) * daily3DBallSpacing + daily3DBallR * 2;
-      const startX3d = col3DCenter - totalW3d / 2 + daily3DBallR;
-
-      for (let j = 0; j < nums3d.length; j++) {
-        const cx = startX3d + j * daily3DBallSpacing;
-        svg += svgCircle(cx, slotCY, daily3DBallR, '#5E2BA7', 'rgba(255,255,255,0.15)', 3);
-        const numStr = nums3d[j] >= 10 ? String(nums3d[j]) : String(nums3d[j]).padStart(2, '0');
-        svg += svgText(cx, slotCY + 10, numStr, { size: 24, weight: '700', color: 'white' });
+    // 3D balls — circles at x=709, 803, 897 (Figma)
+    if (daily3D[slot]) {
+      const nums = daily3D[slot].numbers;
+      for (let j = 0; j < Math.min(nums.length, 3); j++) {
+        const cx = DAILY_3D_BALL_LEFTS[j] + BALL_R;
+        svg += svgCircle(cx, centerY, BALL_R, 'rgba(147, 51, 234, 0.60)', 'rgba(255,255,255,0.20)', 4);
+        const numStr = nums[j] >= 10 ? String(nums[j]) : String(nums[j]).padStart(2, '0');
+        svg += svgText(cx, numSVG_Y, numStr, { size: 32, weight: '700', color: 'white' });
       }
-    } else {
-      svg += svgText(col3DCenter, slotCY + 6, '—', { size: 24, weight: '400', color: 'rgba(255,255,255,0.20)' });
-    }
-
-    // Row separator (except last)
-    if (slotIdx < 2) {
-      const sepY = slotY + dailySlotH + dailySlotGap / 2;
-      svg += `<line x1="80" y1="${sepY}" x2="1016" y2="${sepY}" stroke="rgba(255,255,255,0.06)" stroke-width="1" />`;
     }
   }
-
-  // Vertical divider between 2D and 3D columns
-  const dailySectionBot = curY + 3 * dailySlotH + 2 * dailySlotGap;
-  svg += `<line x1="480" y1="${dailySectionStart}" x2="480" y2="${dailySectionBot}" stroke="rgba(255,255,255,0.08)" stroke-width="1" />`;
 
   // ==========================================
   // FOOTER (standard — anchored at bottom)
   // ==========================================
-  svg += `<line x1="140" y1="${footerTop - 10}" x2="940" y2="${footerTop - 10}" stroke="url(#sep-grad)" stroke-width="1" />`;
   svg += svgText(540, 1169, '18+ only. For info/educational use. Not affiliated with PCSO; Lottong Pinoy does not facilitate betting. Always verify results via official PCSO channels.', {
     size: 22,
     weight: '500',

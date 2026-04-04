@@ -120,3 +120,29 @@ Stage Summary:
 - File modified: src/lib/banner/server-render.ts (buildDailyWinnersSVG function rewritten)
 - Banner renders correctly via /api/daily-winners endpoint
 - Test image saved: download/DailyWinners_2025-09-09_figma-design.png
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Rewrite Daily Winners banner to match exact Figma HTML layout
+
+Work Log:
+- Analyzed user-provided Figma HTML export with exact pixel positions
+- Extracted every CSS position: ball sizes (76px), spacing (90px major, 94px daily), colors, font sizes
+- Rewrote buildDailyWinnersSVG() to match Figma HTML exactly:
+  - Removed "DAILY WINNERS" label (not in Figma)
+  - QR code: NO border, NO background — raw image at (880, 64)
+  - Game names: centered at x=268 between left margin and balls
+  - Major balls: 76px circles starting at x=472, 90px center-to-center
+  - Daily 2D: 76px RED circles (rgba(220,38,38,0.60)) at x=265, 359 — NOT pills
+  - Daily 3D: 76px PURPLE circles (rgba(147,51,234,0.60)) at x=709, 803, 897
+  - All font sizes/weights matching Figma: game names 34px, numbers 32px, section headers 32px
+  - No gradient separators, no pipe separators, no vertical dividers
+  - Footer: standard (disclaimer y=1169, website y=1263)
+  - Dynamic major game count: vertically centered between header and DAILY DRAWS
+- Tested: 1080x1350px PNG, 165KB, 4 channels RGBA
+
+Stage Summary:
+- File: src/lib/banner/server-render.ts — complete rewrite of buildDailyWinnersSVG
+- Banner matches exact Figma HTML pixel positions
+- Test image: download/DailyWinners_2025-09-09_exact_figma.png
