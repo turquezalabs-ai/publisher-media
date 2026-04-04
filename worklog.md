@@ -146,3 +146,29 @@ Stage Summary:
 - File: src/lib/banner/server-render.ts — complete rewrite of buildDailyWinnersSVG
 - Banner matches exact Figma HTML pixel positions
 - Test image: download/DailyWinners_2025-09-09_exact_figma.png
+
+---
+Task ID: 2
+Agent: main
+Task: Rewrite buildDailyWinnersSVG() to match exact Figma HTML pixel coordinates
+
+Work Log:
+- Read config.ts to understand game colors, labels, DAILY_WINNERS_MAJOR_GAMES, time slots
+- Read types.ts to understand LottoResult, DailyDrawEntry interfaces
+- Rewrote buildDailyWinnersSVG() in server-render.ts with pixel-perfect Figma mapping:
+  - Header: Logo 136×136 at (64,64) circular clip, QR 136×136 at (880,64) no border, "Lottong Pinoy" centered with tspan coloring (white+blue), subtitle 25px at y=201, date 28px at y=255
+  - MAJOR GAMES: #B3D0FF label 32px, dynamic row centering with 94px gap, game names right-aligned at x=450, 76px balls at Figma left edges (472,562,652,742,832,922) with 90px spacing, letter-spacing 1.60 on ball numbers
+  - DAILY DRAWS: Fixed positions from Figma - label at y=785, col headers at y=841, time slots at exact CSS tops (877/898, 971/992, 1065/1086), 2D red balls at x=303,397, 3D purple balls at x=747,841,935
+  - Footer: Disclaimer at y=1187/1215, website at y=1262
+  - Added FIGMA_BALL_COLORS map (4D changed from indigo to teal per Figma spec)
+  - Removed pipe separators, gradient separators, "DAILY WINNERS" label
+  - Cleaned up dead code in renderDailyWinnersToBuffer (removed unused digit game loop)
+- Tested render: 1080×1350px PNG, 168KB - SUCCESS
+
+Stage Summary:
+- File modified: src/lib/banner/server-render.ts
+- Test output: /home/z/my-project/download/daily-winners-figma-test.png
+- Build passes: `npx next build` compiles successfully
+- Key design change: Game names now RIGHT-aligned (text-anchor="end" at x=450) instead of centered
+- Ball styling: 76px circles with 4px white/20% border, 60% opacity fills per Figma
+- No structural separators (no pipes, no gradient lines) - clean Figma layout
