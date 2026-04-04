@@ -1,7 +1,5 @@
 {
-  "build": {
-    "command": "mkdir -p /usr/local/share/fonts && cp public/banner-assets/fonts/Montserrat-Medium.ttf /usr/local/share/fonts/ && fc-cache -f 2>/dev/null; npm run build"
-  },
+  "buildCommand": "mkdir -p /usr/local/share/fonts && cp public/banner-assets/fonts/Montserrat-Medium.ttf /usr/local/share/fonts/ && fc-cache -f 2>/dev/null; npm run build",
   "crons": [
     {
       "path": "/api/cron",
