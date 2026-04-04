@@ -9,6 +9,8 @@
  */
 
 import sharp from 'sharp';
+import * as path from 'path';
+import * as fs from 'fs';
 import type { LottoResult, BlueprintNumber, NumberData } from './types';
 import { GAME_COLORS_HEX, GAME_BALL_COUNT, DAILY_DRAW_TIME_SLOTS, DAILY_WINNERS_MAJOR_GAMES, DAILY_WINNERS_DIGIT_GAMES, DAILY_GAME_LABELS } from './config';
 import {
@@ -369,6 +371,26 @@ function buildAnalysisSVG(
 // DAILY WINNERS BANNER SVG
 // ==========================================
 
+// Cache base64-encoded banner assets for embedding in SVG
+let _logoB64: string | null = null;
+let _qrB64: string | null = null;
+
+function getLogoBase64(): string {
+  if (!_logoB64) {
+    const filePath = path.join(process.cwd(), 'public', 'banner-assets', 'logo.png');
+    _logoB64 = fs.readFileSync(filePath).toString('base64');
+  }
+  return _logoB64;
+}
+
+function getQRBase64(): string {
+  if (!_qrB64) {
+    const filePath = path.join(process.cwd(), 'public', 'banner-assets', 'qrcode.png');
+    _qrB64 = fs.readFileSync(filePath).toString('base64');
+  }
+  return _qrB64;
+}
+
 interface DailyDrawEntry {
   game: string;
   gameLabel: string;
@@ -384,166 +406,232 @@ function buildDailyWinnersSVG(
   const W = 1080;
   const H = 1350;
 
-  // Layout constants
-  const headerHeight = 310; // top area (brand + date)
-  const footerHeight = 170; // bottom area (disclaimer + website)
-  const contentTop = headerHeight;
-  const contentBottom = H - footerHeight;
-  const availableHeight = contentBottom - contentTop; // ~870px
+  const logoB64 = getLogoBase64();
+  const qrB64 = getQRBase64();
 
-  // Major games row height: depends on how many
-  const majorRowHeight = 90; // each major game row
-  const majorGap = 8;
-  const majorSectionHeader = 50; // "MAJOR GAMES" label
-  const majorTotalHeight = majorSectionHeader + (majorDraws.length * (majorRowHeight + majorGap));
+  // ---- HEADER (matches BannerHeader component exactly) ----
+  // Logo: 136x136 circle at (64, 64) → center (132, 132)
+  // Brand: "Lottong" white + " Pinoy" blue, size 68, centered at top ~90-173
+  // Subtitle: size 22, at top 186
+  // Date: size 22, at top 220
+  // Label: size 44, at top 265 (when date shown)
+  // QR: 136x136 rounded rect at (880, 64)
+  const headerBottom = 300; // below the label
 
-  // Daily games: 2D (2 circles), 3D (3 circles), 3 time slots each
-  const dailySectionHeader = 50; // "DAILY DRAWS" label
-  const dailyTimeSlotHeight = 80;
-  const dailyGap = 8;
-  const dailyTotalHeight = dailySectionHeader + (3 * (dailyTimeSlotHeight + dailyGap));
+  // ---- FOOTER (matches BannerFooter component exactly) ----
+  // Disclaimer: at top 1169, size 22
+  // Website: at top 1240, size 28
+  const footerTop = 1150; // above disclaimer
 
-  // Separator between major and daily
-  const sectionGap = 30;
+  // ---- CONTENT AREA ----
+  const contentTop = headerBottom + 10;
+  const contentBottom = footerTop - 10;
+  const availableHeight = contentBottom - contentTop;
 
-  // Total content height
-  const totalContentHeight = majorTotalHeight + sectionGap + dailyTotalHeight;
+  // ---- DYNAMIC MAJOR GAMES SIZING ----
+  const majorCount = majorDraws.length;
+  const majorSectionLabelH = 44;
+  let majorRowH: number;
+  let majorRowGap: number;
 
-  // Calculate start Y to center content vertically
-  const contentStartY = contentTop + Math.max(0, (availableHeight - totalContentHeight) / 2);
+  if (majorCount <= 3) {
+    majorRowH = 88;
+    majorRowGap = 10;
+  } else if (majorCount <= 5) {
+    majorRowH = 78;
+    majorRowGap = 8;
+  } else {
+    majorRowH = 68;
+    majorRowGap = 6;
+  }
+
+  const majorTotalH = majorSectionLabelH + majorCount * majorRowH + (majorCount - 1) * majorRowGap;
+
+  // ---- SEPARATOR ----
+  const separatorH = 36; // includes line + padding
+
+  // ---- DAILY DRAWS SIZING ----
+  const dailySectionLabelH = 44;
+  const dailySlotH = 76;
+  const dailySlotGap = 8;
+  const dailySlots = 3;
+  const dailyTotalH = dailySectionLabelH + dailySlots * dailySlotH + (dailySlots - 1) * dailySlotGap;
+
+  // ---- VERTICAL CENTERING ----
+  const totalContentH = majorTotalH + separatorH + dailyTotalH;
+  const startY = contentTop + Math.max(0, (availableHeight - totalContentH) / 2);
 
   let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+  // Add defs for clipping
+  svg += `<defs>`;
+  svg += `<clipPath id="logo-clip"><circle cx="132" cy="132" r="68" /></clipPath>`;
+  svg += `<clipPath id="qr-clip"><rect x="880" y="64" width="136" height="136" rx="12" /></clipPath>`;
+  svg += `</defs>`;
 
-  // Background
+  // ---- BACKGROUND ----
   svg += svgRect(0, 0, W, H, '#111E44');
 
   // ---- HEADER ----
-  // Logo placeholder
-  svg += svgCircle(132, 132, 68, 'rgba(255,255,255,0.10)', 'none', 0);
-  svg += svgText(132, 125, 'LP', { size: 42, weight: '800', color: 'white' });
+  // Logo (circular, with real image)
+  svg += `<circle cx="132" cy="132" r="68" fill="rgba(255,255,255,0.10)" />`;
+  svg += `<image x="64" y="64" width="136" height="136" href="data:image/png;base64,${logoB64}" clip-path="url(#logo-clip)" preserveAspectRatio="xMidYMid slice" />`;
 
-  // QR placeholder
-  svg += svgRect(880, 64, 136, 136, 'rgba(255,255,255,0.90)', 12);
-  svg += svgText(948, 138, 'QR', { size: 28, weight: '700', color: '#333' });
+  // QR Code (rounded rect, with real image)
+  svg += `<rect x="880" y="64" width="136" height="136" rx="12" fill="rgba(255,255,255,0.90)" />`;
+  svg += `<image x="892" y="76" width="112" height="112" href="data:image/png;base64,${qrB64}" clip-path="url(#qr-clip)" preserveAspectRatio="xMidYMid slice" />`;
 
-  // Brand
-  svg += svgText(540, 130, 'Lottong Pinoy', { size: 68, weight: '800', color: 'white' });
+  // Brand Title: "Lottong" (white) + " Pinoy" (blue)
+  svg += `<text x="420" y="158" text-anchor="middle" font-family="${FONT}" font-size="68" font-weight="800" fill="white">Lottong</text>`;
+  svg += `<text x="612" y="158" text-anchor="start" font-family="${FONT}" font-size="68" font-weight="800" fill="#3B82F6"> Pinoy</text>`;
 
-  // Subtitle
-  svg += svgText(540, 181, 'LOTTO DRAW RESULTS', { size: 25, weight: '700', color: 'rgba(255,255,255,0.50)', letterSpacing: 3 });
+  // Subtitle: "LOTTO DRAW RESULTS"
+  svg += svgText(540, 210, 'LOTTO DRAW RESULTS', { size: 22, weight: '700', color: 'rgba(255,255,255,0.40)', letterSpacing: 3.25 });
 
   // Date
-  svg += svgText(540, 230, dateStr, { size: 28, weight: '700', color: 'white', letterSpacing: 2 });
+  svg += svgText(540, 244, dateStr, { size: 22, weight: '600', color: 'white', letterSpacing: 2.80 });
 
-  // ---- MAJOR GAMES ----
-  let curY = contentStartY;
+  // Label: "DAILY WINNERS"
+  svg += svgText(540, 286, 'DAILY WINNERS', { size: 44, weight: '800', color: 'white', letterSpacing: 3 });
+
+  // ---- THIN SEPARATOR LINE under header ----
+  svg += `<line x1="64" y1="308" x2="1016" y2="308" stroke="rgba(255,255,255,0.12)" stroke-width="1" />`;
+
+  // ---- MAJOR GAMES SECTION ----
+  let curY = startY;
 
   // Section header
-  svg += svgText(540, curY + 16, 'MAJOR GAMES', { size: 32, weight: '700', color: '#B3D0FF', letterSpacing: 3 });
-  curY += majorSectionHeader;
+  svg += svgText(64, curY + 18, 'MAJOR GAMES', { size: 22, weight: '700', color: '#93C5FD', letterSpacing: 3, anchor: 'start' });
 
-  for (const entry of majorDraws) {
+  // Thin underline
+  svg += `<line x1="64" y1="${curY + 30}" x2="1016" y2="${curY + 30}" stroke="rgba(147,197,253,0.25)" stroke-width="1" />`;
+  curY += majorSectionLabelH;
+
+  for (let i = 0; i < majorDraws.length; i++) {
+    const entry = majorDraws[i];
     const nums = entry.numbers;
-    const gameName = entry.gameLabel;
-    const ballR = 38;
-    const ballSpacing = 88;
-    const totalBallWidth = (nums.length - 1) * ballSpacing + ballR * 2;
-    const ballStartX = W - 80 - totalBallWidth / 2; // right-aligned with padding
-    const circleY = curY + majorRowHeight / 2;
+    const rowCY = curY + majorRowH / 2;
 
-    // Game name (left side, right-aligned to a fixed point)
-    svg += svgText(300, circleY + 12, gameName, { size: 34, weight: '700', color: 'white', anchor: 'end', letterSpacing: 3 });
+    // Game name — left aligned
+    svg += svgText(80, rowCY + 6, entry.gameLabel, { size: 28, weight: '700', color: 'white', anchor: 'start', letterSpacing: 1.5 });
 
-    // Number circles (right side)
+    // Number circles — right side
+    const ballR = Math.min(32, majorRowH / 2 - 6);
+    const ballSpacing = ballR * 2 + 12;
+    const totalBallW = (nums.length - 1) * ballSpacing + ballR * 2;
+    // Right-align balls: end at x=1016
+    const ballsEndX = 1016;
+    const ballsStartX = ballsEndX - totalBallW;
+
     const fillColor = getCircleFill(entry.game, 0.6);
-    for (let i = 0; i < nums.length; i++) {
-      const cx = ballStartX - totalBallWidth / 2 + ballR + i * ballSpacing;
-      svg += svgCircle(cx, circleY, ballR, fillColor, 'rgba(255,255,255,0.20)', 4);
-      const numStr = nums[i] >= 10 ? String(nums[i]) : String(nums[i]).padStart(2, '0');
-      svg += svgText(cx, circleY + 12, numStr, { size: 32, weight: '700', color: 'white' });
+    for (let j = 0; j < nums.length; j++) {
+      const cx = ballsStartX + ballR + j * ballSpacing;
+      svg += svgCircle(cx, rowCY, ballR, fillColor, 'rgba(255,255,255,0.20)', 3);
+      const numStr = nums[j] >= 10 ? String(nums[j]) : String(nums[j]).padStart(2, '0');
+      svg += svgText(cx, rowCY + 10, numStr, { size: Math.min(28, ballR - 4), weight: '700', color: 'white' });
     }
 
-    curY += majorRowHeight + majorGap;
+    // Thin row separator (except last)
+    if (i < majorDraws.length - 1) {
+      const sepY = curY + majorRowH + majorRowGap / 2;
+      svg += `<line x1="80" y1="${sepY}" x2="1016" y2="${sepY}" stroke="rgba(255,255,255,0.06)" stroke-width="1" />`;
+    }
+
+    curY += majorRowH + majorRowGap;
   }
 
-  // ---- SEPARATOR ----
-  curY += sectionGap - majorGap; // adjust gap
- 
-  // ---- DAILY DRAWS ----
-  // Section header
-  svg += svgText(540, curY + 16, 'DAILY DRAWS', { size: 32, weight: '700', color: '#B3D0FF', letterSpacing: 3 });
-  curY += dailySectionHeader;
+  // ---- SEPARATOR between Major and Daily ----
+  curY += 8;
+  svg += `<line x1="64" y1="${curY}" x2="1016" y2="${curY}" stroke="rgba(255,255,255,0.12)" stroke-width="1" />`;
+  curY += separatorH - 8;
 
-  // 2D section (left half)
+  // ---- DAILY DRAWS SECTION ----
+  // Section header
+  svg += svgText(64, curY + 18, 'DAILY DRAWS', { size: 22, weight: '700', color: '#93C5FD', letterSpacing: 3, anchor: 'start' });
+  svg += `<line x1="64" y1="${curY + 30}" x2="1016" y2="${curY + 30}" stroke="rgba(147,197,253,0.25)" stroke-width="1" />`;
+  curY += dailySectionLabelH;
+
+  // Separate 2D and 3D entries
   const daily2D = dailyDraws.filter(d => d.game === '2D');
-  // 3D section (right half)
   const daily3D = dailyDraws.filter(d => d.game === '3D');
 
+  // Column positions
+  const leftColCenter = 300;   // 2D center area
+  const rightColCenter = 780;  // 3D center area
+  const dividerX = 540;        // vertical divider
+
   for (let slotIdx = 0; slotIdx < 3; slotIdx++) {
-    const slotY = curY + slotIdx * (dailyTimeSlotHeight + dailyGap);
+    const slotY = curY + slotIdx * (dailySlotH + dailySlotGap);
     const slotLabel = DAILY_DRAW_TIME_SLOTS[slotIdx];
+    const slotCY = slotY + dailySlotH / 2;
 
-    // Time slot labels
-    svg += svgText(350, slotY + 24, slotLabel, { size: 26, weight: '700', color: 'white', anchor: 'end', letterSpacing: 3 });
-    svg += svgText(750, slotY + 24, slotLabel, { size: 26, weight: '700', color: 'white', anchor: 'end', letterSpacing: 3 });
+    // Time slot label
+    svg += svgText(dividerX - 16, slotCY - 12, slotLabel, { size: 20, weight: '700', color: 'rgba(255,255,255,0.50)', anchor: 'end', letterSpacing: 2 });
 
-    // Game labels (above circles)
-    svg += svgText(350, slotY + 2, '2D EZ2 Lotto', { size: 30, weight: '700', color: 'white', anchor: 'end', letterSpacing: 3 });
-    svg += svgText(750, slotY + 2, '3D Swertres', { size: 30, weight: '700', color: 'white', anchor: 'end', letterSpacing: 3 });
-
-    // 2D circles (2 circles)
+    // ---- 2D (left side) ----
+    // Game label
+    svg += svgText(leftColCenter, slotCY - 20, '2D EZ2', { size: 18, weight: '600', color: 'rgba(255,255,255,0.50)', letterSpacing: 2 });
     if (daily2D[slotIdx]) {
       const nums2d = daily2D[slotIdx].numbers;
-      const r2d = 38;
-      const spacing2d = 90;
-      const startX2d = 370; // left of center
+      const r2d = 30;
+      const sp2d = r2d * 2 + 14;
+      const totalW2d = (Math.min(nums2d.length, 2) - 1) * sp2d + r2d * 2;
+      const startX2d = leftColCenter - totalW2d / 2 + r2d;
 
-      // Determine center based on 2 circles
-      const centerX2d = startX2d + r2d + spacing2d / 2;
-      const actualX2d = 375; // fixed left position
-
-      for (let j = 0; j < nums2d.length && j < 2; j++) {
-        const cx = actualX2d + j * spacing2d;
-        const cy = slotY + dailyTimeSlotHeight / 2 + 10;
-        svg += svgCircle(cx, cy, r2d, getCircleFill('2D', 0.6), 'rgba(255,255,255,0.20)', 4);
+      for (let j = 0; j < Math.min(nums2d.length, 2); j++) {
+        const cx = startX2d + j * sp2d;
+        const cy = slotCY + 12;
+        svg += svgCircle(cx, cy, r2d, getCircleFill('2D', 0.6), 'rgba(255,255,255,0.20)', 3);
         const numStr = nums2d[j] >= 10 ? String(nums2d[j]) : String(nums2d[j]).padStart(2, '0');
-        svg += svgText(cx, cy + 12, numStr, { size: 32, weight: '700', color: 'white' });
+        svg += svgText(cx, cy + 9, numStr, { size: 26, weight: '700', color: 'white' });
       }
     } else {
-      // No draw for this slot
-      svg += svgText(420, slotY + dailyTimeSlotHeight / 2 + 12, 'No Draw', { size: 24, weight: '500', color: 'rgba(255,255,255,0.30)' });
+      svg += svgText(leftColCenter, slotCY + 14, '—', { size: 24, weight: '400', color: 'rgba(255,255,255,0.20)' });
     }
 
-    // 3D circles (3 circles)
+    // ---- 3D (right side) ----
+    svg += svgText(rightColCenter, slotCY - 20, '3D Swertres', { size: 18, weight: '600', color: 'rgba(255,255,255,0.50)', letterSpacing: 2 });
     if (daily3D[slotIdx]) {
       const nums3d = daily3D[slotIdx].numbers;
-      const r3d = 38;
-      const spacing3d = 88;
-      const actualX3d = 660;
+      const r3d = 30;
+      const sp3d = r3d * 2 + 14;
+      const totalW3d = (Math.min(nums3d.length, 3) - 1) * sp3d + r3d * 2;
+      const startX3d = rightColCenter - totalW3d / 2 + r3d;
 
-      for (let j = 0; j < nums3d.length && j < 3; j++) {
-        const cx = actualX3d + j * spacing3d;
-        const cy = slotY + dailyTimeSlotHeight / 2 + 10;
-        svg += svgCircle(cx, cy, r3d, getCircleFill('3D', 0.6), 'rgba(255,255,255,0.20)', 4);
+      for (let j = 0; j < Math.min(nums3d.length, 3); j++) {
+        const cx = startX3d + j * sp3d;
+        const cy = slotCY + 12;
+        svg += svgCircle(cx, cy, r3d, getCircleFill('3D', 0.6), 'rgba(255,255,255,0.20)', 3);
         const numStr = nums3d[j] >= 10 ? String(nums3d[j]) : String(nums3d[j]).padStart(2, '0');
-        svg += svgText(cx, cy + 12, numStr, { size: 32, weight: '700', color: 'white' });
+        svg += svgText(cx, cy + 9, numStr, { size: 26, weight: '700', color: 'white' });
       }
     } else {
-      svg += svgText(720, slotY + dailyTimeSlotHeight / 2 + 12, 'No Draw', { size: 24, weight: '500', color: 'rgba(255,255,255,0.30)' });
+      svg += svgText(rightColCenter, slotCY + 14, '—', { size: 24, weight: '400', color: 'rgba(255,255,255,0.20)' });
+    }
+
+    // Vertical divider between 2D and 3D (subtle)
+    if (slotIdx < 2) {
+      const sepY = slotY + dailySlotH + dailySlotGap / 2;
+      svg += `<line x1="80" y1="${sepY}" x2="1016" y2="${sepY}" stroke="rgba(255,255,255,0.06)" stroke-width="1" />`;
     }
   }
 
-  // ---- FOOTER ----
-  // Disclaimer
-  svg += svgText(540, H - 170, '18+ only. For info/educational use. Not affiliated with PCSO; Lottong Pinoy does not facilitate betting. Always verify results via official PCSO channels.', {
+  // Vertical divider between 2D and 3D columns
+  const dailySectionTop = startY + majorTotalH + separatorH;
+  const dailySectionBot = dailySectionTop + dailyTotalH;
+  svg += `<line x1="${dividerX}" y1="${dailySectionTop}" x2="${dividerX}" y2="${dailySectionBot}" stroke="rgba(255,255,255,0.08)" stroke-width="1" />`;
+
+  // ---- THIN SEPARATOR LINE above footer ----
+  svg += `<line x1="64" y1="${footerTop - 10}" x2="1016" y2="${footerTop - 10}" stroke="rgba(255,255,255,0.12)" stroke-width="1" />`;
+
+  // ---- FOOTER (anchored at bottom, matches BannerFooter exactly) ----
+  svg += svgText(540, 1169, '18+ only. For info/educational use. Not affiliated with PCSO; Lottong Pinoy does not facilitate betting. Always verify results via official PCSO channels.', {
     size: 22,
     weight: '500',
     color: 'rgba(255,255,255,0.60)',
-    letterSpacing: 1,
+    letterSpacing: 1.32,
   });
 
-  // Website
-  svg += svgText(540, H - 110, 'lottong-pinoy.com', { size: 28, weight: '700', color: 'white' });
+  svg += svgText(540, 1263, 'lottong-pinoy.com', { size: 28, weight: '700', color: 'white' });
 
   svg += '</svg>';
   return svg;
