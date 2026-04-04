@@ -149,3 +149,33 @@ export const BLUEPRINT_GRID_ROWS = 4;
 // Banner dimensions
 export const BANNER_WIDTH = 1080;
 export const BANNER_HEIGHT = 1350;
+
+// ==========================================
+// DAILY WINNERS SCHEDULE
+// ==========================================
+// Posts a recap of all yesterday's winning numbers.
+// Post time: 6:30 AM PH daily
+// Skipped if no draws (holiday, Holy Week).
+export const DAILY_WINNERS_POST_TIME = '06:30';
+
+// Major games shown in the Daily Winners banner
+export const DAILY_WINNERS_MAJOR_GAMES = ['6/58', '6/55', '6/49', '6/45', '6/42', '6D', '4D'];
+
+// Daily digit games shown in the Daily Winners banner
+export const DAILY_WINNERS_DIGIT_GAMES = ['3D', '2D'];
+
+// Time slots for daily digit games (2PM, 5PM, 9PM)
+export const DAILY_DRAW_TIME_SLOTS = ['2PM', '5PM', '9PM'];
+
+// Game name display for daily winners (shorter for layout)
+export const DAILY_GAME_LABELS: Record<string, string> = {
+  '6/58': 'Ultra Lotto 6/58',
+  '6/55': 'Grand Lotto 6/55',
+  '6/49': 'Super Lotto 6/49',
+  '6/45': 'Mega Lotto 6/45',
+  '6/42': 'Lotto 6/42',
+  '6D': '6D Lotto',
+  '4D': '4D Lotto',
+  '3D': '3D Swertres',
+  '2D': '2D EZ2 Lotto',
+};

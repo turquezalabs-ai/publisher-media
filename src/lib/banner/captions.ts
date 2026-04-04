@@ -285,6 +285,49 @@ export function getBlueprintCaptionCount(): number {
   return BLUEPRINT_CAPTIONS.length;
 }
 
+// ==========================================
+// DAILY WINNERS CAPTIONS (14 templates)
+// ==========================================
+const DAILY_WINNERS_CAPTIONS: string[] = [
+  'Here are yesterday\'s PCSO lotto draw results. All winning numbers from [Date] in one view. Always verify via official PCSO channels.',
+  'All draw results from [Date] are in! Check the winning combinations across all PCSO games. Not affiliated with PCSO.',
+  'Yesterday\'s complete PCSO draw recap for [Date]. Major games and daily digit results all in one post.',
+  'The numbers from [Date] are official. Here\'s your complete PCSO draw results recap from Lottong Pinoy.',
+  'All PCSO lotto results for [Date] — major games and digit games combined. Verify results via official PCSO channels.',
+  'Your daily PCSO draw summary for [Date]. Every winning number from yesterday\'s draws in one banner.',
+  'Complete PCSO draw results for [Date]. Major lotto and digit game numbers all mapped out for you.',
+  '[Date] draw results are live! All PCSO winning numbers from yesterday\'s draws in one place.',
+  'Yesterday\'s PCSO numbers for [Date] — your quick recap across all lotto and digit games.',
+  'All winning combinations from [Date] PCSO draws. From Ultra Lotto to 2D EZ2 — everything in one view.',
+  'PCSO draw results for [Date] are here. Check the winning numbers for all major and daily games.',
+  'Your [Date] PCSO results roundup. Every lotto and digit game result from yesterday, verified and compiled.',
+  'Here\'s what hit yesterday, [Date]. All PCSO draw results across major and daily games.',
+  'The [Date] PCSO draw is complete. Here are all the winning numbers — major lotto and digit games included.',
+];
+
+/**
+ * Generate a daily winners caption.
+ * dateStr: ISO date like "2026-03-24"
+ */
+export function generateDailyWinnersCaption(dateStr: string, majorGames: string[]): string {
+  const formattedDate = formatDrawDate(dateStr);
+  const templateIndex = Math.floor(Math.random() * DAILY_WINNERS_CAPTIONS.length);
+  const template = DAILY_WINNERS_CAPTIONS[templateIndex];
+  let caption = template.replace(/\[Date\]/g, formattedDate);
+
+  const hashtags = majorGames
+    .map(g => GAME_HASHTAGS[g] || '')
+    .filter(Boolean)
+    .join(' ');
+  const commonHashtags = '#PCSO #LottongPinoy #PCSOResults #LottoResults';
+
+  return `${caption}\n\n${hashtags}\n${commonHashtags}`;
+}
+
+export function getBlueprintCaptionCount(): number {
+  return BLUEPRINT_CAPTIONS.length;
+}
+
 export function getAnalysisCaptionCount(): number {
   return ANALYSIS_CAPTIONS.length;
 }

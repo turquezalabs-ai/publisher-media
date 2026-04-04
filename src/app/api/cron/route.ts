@@ -33,8 +33,8 @@ import {
   ANALYSIS_POST_GAP_MINUTES,
 } from '@/lib/banner/config';
 import { generateBlueprintNumbers } from '@/lib/banner/analysis';
-import { generateBlueprintCaptionV2, generateAnalysisCaption } from '@/lib/banner/captions';
-import { renderBlueprintToBuffer, renderAnalysisToBuffer } from '@/lib/banner/server-render';
+import { generateBlueprintCaptionV2, generateAnalysisCaption, generateDailyWinnersCaption } from '@/lib/banner/captions';
+import { renderBlueprintToBuffer, renderAnalysisToBuffer, renderDailyWinnersToBuffer } from '@/lib/banner/server-render';
 import { calculateFrequency, classifyNumbers, parseCombination } from '@/lib/banner/analysis';
 import type { LottoResult, NumberData } from '@/lib/banner/types';
 
@@ -124,13 +124,21 @@ function isBlueprintTime(): boolean {
   return hour === 10 && Math.abs(minute - 0) <= 7;
 }
 
+/**
+ * Check if it's time for the daily winners post (6:30 AM PH ± 7 min).
+ */
+function isDailyWinnersTime(): boolean {
+  const { hour, minute } = getCurrentTimePH();
+  return hour === 6 && Math.abs(minute - 30) <= 7;
+}
+
 // ==========================================
 // PUBLISH LOGGING
 // ==========================================
 
 interface CronLogEntry {
   timestamp: string;
-  type: 'blueprint' | 'analysis';
+  type: 'blueprint' | 'analysis' | 'daily-winners';
   game: string;
   status: 'success' | 'skipped' | 'error';
   message: string;
@@ -226,6 +234,99 @@ async function publishBlueprint(data: LottoResult[]): Promise<void> {
       timestamp: new Date().toISOString(),
       type: 'blueprint',
       game,
+      status: 'error',
+      message: `Exception: ${err instanceof Error ? err.message : String(err)}`,
+    });
+  }
+}
+
+// ==========================================
+// DAILY WINNERS PUBLISH
+// ==========================================
+
+async function publishDailyWinners(data: LottoResult[]): Promise<void> {
+  const yesterdayISO = getYesterdayPH();
+  const displayDate = formatDisplayDate(yesterdayISO);
+
+  log({
+    timestamp: new Date().toISOString(),
+    type: 'daily-winners',
+    game: 'all',
+    status: 'success',
+    message: `Starting daily winners publish for ${yesterdayISO}`,
+  });
+
+  try {
+    // Get all draws from yesterday
+    const yesterdayDraws = data.filter(d => d.date === yesterdayISO);
+
+    if (yesterdayDraws.length === 0) {
+      log({
+        timestamp: new Date().toISOString(),
+        type: 'daily-winners',
+        game: 'all',
+        status: 'skipped',
+        message: `No draws found for ${yesterdayISO}. Holiday or no data — skipping.`,
+      });
+      return;
+    }
+
+    // Render banner
+    const imageBuffer = await renderDailyWinnersToBuffer(displayDate, yesterdayDraws);
+
+    // Determine which major games were drawn for hashtags
+    const majorGames = yesterdayDraws
+      .map(d => d.game)
+      .filter(g => ['6/58', '6/55', '6/49', '6/45', '6/42', '6D', '4D'].includes(g));
+
+    // Generate caption
+    const caption = generateDailyWinnersCaption(yesterdayISO, [...new Set(majorGames)]);
+
+    // Publish
+    const accessToken = process.env.META_ACCESS_TOKEN;
+    if (!accessToken) {
+      log({
+        timestamp: new Date().toISOString(),
+        type: 'daily-winners',
+        game: 'all',
+        status: 'error',
+        message: 'META_ACCESS_TOKEN not configured',
+      });
+      return;
+    }
+
+    const result = await publishToFacebookWithBuffer({
+      pageAccessToken: accessToken,
+      pageId: FACEBOOK_PAGE_ID,
+      imageBuffer,
+      fileName: `daily-winners-${yesterdayISO}-${Date.now()}.png`,
+      mimeType: 'image/png',
+      caption,
+    });
+
+    if (result.success) {
+      log({
+        timestamp: new Date().toISOString(),
+        type: 'daily-winners',
+        game: 'all',
+        status: 'success',
+        message: `Published! Post ID: ${result.postId}`,
+        postId: result.postId,
+      });
+    } else {
+      log({
+        timestamp: new Date().toISOString(),
+        type: 'daily-winners',
+        game: 'all',
+        status: 'error',
+        message: `Publish failed: ${result.error}`,
+      });
+    }
+  } catch (err) {
+    log({
+      timestamp: new Date().toISOString(),
+      type: 'daily-winners',
+      game: 'all',
       status: 'error',
       message: `Exception: ${err instanceof Error ? err.message : String(err)}`,
     });
@@ -408,7 +509,12 @@ export async function GET(request: NextRequest) {
 
   // ---- 2. Determine what to run ----
   const { hour, minute } = getCurrentTimePH();
-  const tasks: { type: 'blueprint' | 'analysis'; slot?: number }[] = [];
+  const tasks: { type: 'blueprint' | 'analysis' | 'daily-winners'; slot?: number }[] = [];
+
+  // Daily Winners: 6:30 AM PH ± 7 min
+  if (isDailyWinnersTime()) {
+    tasks.push({ type: 'daily-winners' });
+  }
 
   // Blueprint: 10:00 AM PH ± 7 min
   if (isBlueprintTime()) {
@@ -452,6 +558,15 @@ export async function GET(request: NextRequest) {
         game: getTodayBlueprintGame(),
         status: 'success',
         message: 'Blueprint job executed',
+      });
+    } else if (task.type === 'daily-winners') {
+      await publishDailyWinners(data);
+      results.push({
+        timestamp: new Date().toISOString(),
+        type: 'daily-winners',
+        game: 'all',
+        status: 'success',
+        message: 'Daily winners job executed',
       });
     } else if (task.type === 'analysis' && task.slot !== undefined) {
       await publishAnalysis(data, task.slot);
