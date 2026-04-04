@@ -95,3 +95,28 @@ Stage Summary:
 - User can now access Daily Winners banner via the "Winners" tab in the UI
 - Can pick any date, generate preview, download PNG, and publish to Facebook
 - Auto-posts at 6:30 AM PHT daily via cron (already configured)
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Redesign Daily Winners banner to match Figma design
+
+Work Log:
+- Read existing server-render.ts to understand Blueprint/Analysis header/footer/logo/QR pattern
+- Found logo (public/banner-assets/logo.png) and QR code (public/banner-assets/qrcode.png) assets
+- Analyzed Figma design reference (upload/Frame 50.png) using VLM - extracted exact layout specs
+- Rewrote buildDailyWinnersSVG() with Figma-matching layout:
+  - Header: Kept standard (logo, QR, "Lottong Pinoy" brand, subtitle, date, "DAILY WINNERS" label)
+  - Major Games: Game name left-aligned with pipe "|" separator, colored number balls (Figma colors, 73px diameter, 90px spacing)
+  - Daily Draws: 2D as maroon capsule pills (#8A2332), 3D as purple circles (#5E2BA7), time labels on left
+  - Added gradient separator lines (fade-in/fade-out) between sections
+  - Added column headers "2D EZ2 Lotto" / "3D Swertres"
+  - Footer: Kept standard (disclaimer + website URL anchored at bottom)
+  - Background: #101E44 matching Figma
+- Added FIGMA_BALL_COLORS constant with game-specific solid colors from Figma design
+- Tested rendering: 1080x1350px PNG generated successfully (146KB, RGBA)
+
+Stage Summary:
+- File modified: src/lib/banner/server-render.ts (buildDailyWinnersSVG function rewritten)
+- Banner renders correctly via /api/daily-winners endpoint
+- Test image saved: download/DailyWinners_2025-09-09_figma-design.png
