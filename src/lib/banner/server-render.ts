@@ -4,7 +4,7 @@
  * Generates 1080x1350px banner images using SVG + sharp.
  * Used by the cron system for auto-publishing when no browser is available.
  *
- * Uses system fonts (Arial/Helvetica) as Montserrat is not available server-side.
+ * Uses embedded Montserrat font (variable weight TTF) for brand consistency.
  * Emojis are rendered as Unicode text (supported by sharp/librsvg).
  */
 
@@ -58,10 +58,30 @@ function getCircleFillAlt(game: string, opacity: number = 0.4): string {
 }
 
 // ==========================================
+// EMBEDDED FONT (Montserrat)
+// ==========================================
+
+let _montserratB64: string | null = null;
+
+function getMontserratBase64(): string {
+  if (!_montserratB64) {
+    const filePath = path.join(process.cwd(), 'public', 'banner-assets', 'fonts', 'Montserrat-Medium.ttf');
+    _montserratB64 = fs.readFileSync(filePath).toString('base64');
+  }
+  return _montserratB64;
+}
+
+/** SVG <style> block with @font-face for Montserrat */
+function svgFontStyle(): string {
+  const b64 = getMontserratBase64();
+  return `<style>@font-face { font-family: 'Montserrat'; src: url(data:font/ttf;base64,${b64}) format('truetype'); font-weight: 100 900; font-style: normal; }</style>`;
+}
+
+// ==========================================
 // SVG HELPERS
 // ==========================================
 
-const FONT = 'Arial, Helvetica, sans-serif';
+const FONT = "'Montserrat', Arial, Helvetica, sans-serif";
 
 function svgCircle(cx: number, cy: number, r: number, fill: string, stroke: string = 'rgba(255,255,255,0.20)', strokeWidth: number = 4): string {
   return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" />`;
@@ -126,6 +146,7 @@ function buildBlueprintSVG(game: string, gameName: string, numbers: BlueprintNum
   const coldCount = numbers.filter(n => n.category === 'cold').length;
 
   let svg = `<svg width="1080" height="1350" xmlns="http://www.w3.org/2000/svg">`;
+  svg += svgFontStyle();
 
   // Background
   svg += svgRect(0, 0, 1080, 1350, '#111E44');
@@ -269,6 +290,7 @@ function buildAnalysisSVG(
   const patternLineHeight = 65;
 
   let svg = `<svg width="1080" height="1350" xmlns="http://www.w3.org/2000/svg">`;
+  svg += svgFontStyle();
 
   // Background
   svg += svgRect(0, 0, 1080, 1350, '#111E44');
@@ -459,6 +481,7 @@ function buildDailyWinnersSVG(
   const majorFirstRowCSS = majorLabelCSS + majorLabelGap;
 
   let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+  svg += svgFontStyle();
   svg += `<defs><clipPath id="logo-clip"><circle cx="132" cy="132" r="68" /></clipPath></defs>`;
 
   // ---- BACKGROUND ----
