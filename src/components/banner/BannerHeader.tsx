@@ -93,7 +93,7 @@ const BannerHeader: React.FC<BannerHeaderProps> = ({
       <div style={{
         width: 672,
         left: 209,
-        top: 186,
+        top: 192,
         position: 'absolute',
         textAlign: 'center',
         color: 'rgba(255, 255, 255, 0.40)',
@@ -110,7 +110,7 @@ const BannerHeader: React.FC<BannerHeaderProps> = ({
         <div style={{
           width: 1080,
           left: 0,
-          top: 220,
+          top: 228,
           position: 'absolute',
           textAlign: 'center',
           color: 'white',
@@ -134,7 +134,7 @@ const BannerHeader: React.FC<BannerHeaderProps> = ({
         fontSize: 44,
         fontFamily: 'Montserrat, sans-serif',
         fontWeight: 800,
-        letterSpacing: 3,
+        letterSpacing: 8,
       }}>
         {label}
       </div>

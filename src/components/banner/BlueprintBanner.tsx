@@ -74,7 +74,7 @@ const BlueprintBanner: React.FC<BlueprintBannerProps> = ({
         }}>
           <span style={{
             color: 'white',
-            fontSize: 20,
+            fontSize: 24,
             fontFamily: 'Montserrat, sans-serif',
             fontWeight: 600,
             lineHeight: '24px',
@@ -84,10 +84,10 @@ const BlueprintBanner: React.FC<BlueprintBannerProps> = ({
           </span>
           <span style={{
             color: 'rgba(255, 255, 255, 0.50)',
-            fontSize: 16,
+            fontSize: 20,
             fontFamily: 'Montserrat, sans-serif',
             fontWeight: 500,
-            lineHeight: '20px',
+            lineHeight: '30px',
             letterSpacing: 0.80,
           }}>
             (High occurrence)
@@ -102,7 +102,7 @@ const BlueprintBanner: React.FC<BlueprintBannerProps> = ({
         }}>
           <span style={{
             color: 'white',
-            fontSize: 20,
+            fontSize: 24,
             fontFamily: 'Montserrat, sans-serif',
             fontWeight: 600,
             lineHeight: '24px',
@@ -112,10 +112,10 @@ const BlueprintBanner: React.FC<BlueprintBannerProps> = ({
           </span>
           <span style={{
             color: 'rgba(255, 255, 255, 0.50)',
-            fontSize: 16,
+            fontSize: 20,
             fontFamily: 'Montserrat, sans-serif',
             fontWeight: 500,
-            lineHeight: '20px',
+            lineHeight: '30px',
             letterSpacing: 0.80,
           }}>
             (Avg. occurrence)
@@ -130,7 +130,7 @@ const BlueprintBanner: React.FC<BlueprintBannerProps> = ({
         }}>
           <span style={{
             color: 'white',
-            fontSize: 20,
+            fontSize: 24,
             fontFamily: 'Montserrat, sans-serif',
             fontWeight: 600,
             lineHeight: '24px',
@@ -140,10 +140,10 @@ const BlueprintBanner: React.FC<BlueprintBannerProps> = ({
           </span>
           <span style={{
             color: 'rgba(255, 255, 255, 0.50)',
-            fontSize: 16,
+            fontSize: 20,
             fontFamily: 'Montserrat, sans-serif',
             fontWeight: 500,
-            lineHeight: '20px',
+            lineHeight: '30px',
             letterSpacing: 0.80,
           }}>
             (Low Occurrence)
