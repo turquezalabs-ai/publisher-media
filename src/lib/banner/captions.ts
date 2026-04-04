@@ -281,10 +281,6 @@ function generateKeyInsights(
   return insightLines.join('\n');
 }
 
-export function getBlueprintCaptionCount(): number {
-  return BLUEPRINT_CAPTIONS.length;
-}
-
 // ==========================================
 // DAILY WINNERS CAPTIONS (14 templates)
 // ==========================================

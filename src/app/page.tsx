@@ -67,9 +67,59 @@ export default function BannerStudio() {
   const [analysisClassified, setAnalysisClassified] = useState<NumberData[]>([]);
   const [analysisGameData, setAnalysisGameData] = useState<LottoResult[]>([]);
 
+  // Daily Winners state
+  const [winnersDate, setWinnersDate] = useState('');
+  const [winnersImageUrl, setWinnersImageUrl] = useState<string | null>(null);
+  const [winnersLoading, setWinnersLoading] = useState(false);
+  const [winnersError, setWinnersError] = useState<string | null>(null);
+
   // Refs for hidden capture targets (full size, off-screen)
   const captureBlueprintRef = useRef<HTMLDivElement>(null);
   const captureAnalysisRef = useRef<HTMLDivElement>(null);
+
+  // ==========================================
+  // DAILY WINNERS
+  // ==========================================
+  const handleGenerateDailyWinners = useCallback(async () => {
+    if (!winnersDate) return;
+    setWinnersLoading(true);
+    setWinnersError(null);
+    setWinnersImageUrl(null);
+    try {
+      const res = await fetch(`/api/daily-winners?date=${winnersDate}&t=${Date.now()}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: 'Failed to render banner' }));
+        setWinnersError(errData.error || `Error ${res.status}`);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setWinnersImageUrl(url);
+    } catch (err) {
+      setWinnersError(err instanceof Error ? err.message : 'Failed to generate banner');
+    } finally {
+      setWinnersLoading(false);
+    }
+  }, [winnersDate]);
+
+  // Set default winners date to yesterday
+  useEffect(() => {
+    const now = new Date();
+    now.setDate(now.getDate() - 1);
+    const phTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + 3600000 * 8);
+    const yyyy = phTime.getFullYear();
+    const mm = String(phTime.getMonth() + 1).padStart(2, '0');
+    const dd = String(phTime.getDate()).padStart(2, '0');
+    setWinnersDate(`${yyyy}-${mm}-${dd}`);
+  }, []);
+
+  const handleDownloadDailyWinners = () => {
+    if (!winnersDate) return;
+    const link = document.createElement('a');
+    link.href = `/api/daily-winners?date=${winnersDate}&download=true&t=${Date.now()}`;
+    link.download = `DailyWinners_${winnersDate}.png`;
+    link.click();
+  };
 
 
   // ==========================================
@@ -157,6 +207,12 @@ export default function BannerStudio() {
   // ==========================================
   // CAPTURE & DOWNLOAD
   // ==========================================
+  // Cleanup winners image URL on unmount
+  useEffect(() => {
+    return () => {
+      if (winnersImageUrl) URL.revokeObjectURL(winnersImageUrl);
+    };
+  }, [winnersImageUrl]);
   const handleDownloadSingle = async (
     ref: React.RefObject<HTMLDivElement | null>,
     filename: string
@@ -377,8 +433,11 @@ export default function BannerStudio() {
                 <TabsTrigger value="analysis" className="flex-1 data-[state=active]:bg-purple-600 data-[state=active]:text-white">
                   Analysis
                 </TabsTrigger>
+                <TabsTrigger value="winners" className="flex-1 data-[state=active]:bg-amber-600 data-[state=active]:text-white">
+                  Winners
+                </TabsTrigger>
                 <TabsTrigger value="publish" className="flex-1 data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
-                  🚀 Publish
+                  🚀
                 </TabsTrigger>
               </TabsList>
 
@@ -451,6 +510,65 @@ export default function BannerStudio() {
                         </p>
                       </div>
                     )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* ---- WINNERS TAB ---- */}
+              <TabsContent value="winners" className="space-y-4 mt-4">
+                <Card className="bg-gray-900 border-gray-800">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-white text-base">Daily Winners</CardTitle>
+                    <CardDescription className="text-gray-400 text-sm">
+                      All winning numbers from a specific date
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <label className="text-gray-400 text-sm font-medium block mb-1.5">Date</label>
+                      <div className="bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white text-sm">
+                        <input
+                          type="date"
+                          value={winnersDate}
+                          onChange={(e) => { setWinnersDate(e.target.value); setWinnersImageUrl(null); setWinnersError(null); }}
+                          className="bg-transparent border-none outline-none text-white w-full [color-scheme:dark]"
+                        />
+                      </div>
+                    </div>
+
+                    <Separator className="bg-gray-800" />
+
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        onClick={handleGenerateDailyWinners}
+                        disabled={!winnersDate || winnersLoading}
+                        className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold"
+                      >
+                        {winnersLoading ? 'Generating...' : 'Generate Banner'}
+                      </Button>
+                      <Button
+                        onClick={handleDownloadDailyWinners}
+                        disabled={!winnersImageUrl}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                      >
+                        Download PNG
+                      </Button>
+                    </div>
+
+                    {winnersError && (
+                      <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                        <p className="text-red-400 text-xs">{winnersError}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gray-900 border-gray-800">
+                  <CardContent className="pt-4 space-y-2">
+                    <p className="text-gray-500 text-xs">Format: 1080 x 1350px</p>
+                    <p className="text-gray-500 text-xs">Shows all major games + daily draws</p>
+                    <p className="text-gray-500 text-xs">Auto-posts at 6:30 AM PHT daily</p>
+                    <p className="text-gray-500 text-xs">Skips on holidays (no draws)</p>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -530,7 +648,9 @@ export default function BannerStudio() {
                 }}
               >
                 <div style={{ transform: 'scale(0.3)', transformOrigin: 'top left', width: 1080, height: 1350 }}>
-                  {activeTab === 'blueprint' && blueprintNumbers.length > 0 ? (
+                  {activeTab === 'winners' && winnersImageUrl ? (
+                    <img src={winnersImageUrl} alt="Daily Winners" style={{ width: 1080, height: 1350 }} />
+                  ) : activeTab === 'blueprint' && blueprintNumbers.length > 0 ? (
                     <BlueprintBanner game={blueprintGame} numbers={blueprintNumbers} />
                   ) : activeTab === 'analysis' && analysisDraw ? (
                     <AnalysisBanner
@@ -541,6 +661,15 @@ export default function BannerStudio() {
                       classifiedNumbers={analysisClassified}
                       gameData={analysisGameData}
                     />
+                  ) : activeTab === 'winners' && winnersLoading ? (
+                    <div style={{ width: 1080, height: 1350, background: '#111E44', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 28 }}>Generating banner...</span>
+                    </div>
+                  ) : activeTab === 'winners' ? (
+                    <div style={{ width: 1080, height: 1350, background: '#111E44', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+                      <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 32 }}>🏆</span>
+                      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 24 }}>Pick a date and click Generate</span>
+                    </div>
                   ) : (
                     <div style={{ width: 1080, height: 1350, background: '#111E44', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 28 }}>Generating...</span>
@@ -570,6 +699,11 @@ export default function BannerStudio() {
                 onClick={() => setActiveTab('analysis')}
                 className={activeTab === 'analysis' ? 'bg-purple-600' : 'border-gray-700 text-gray-400'}
               >Analysis</Button>
+              <Button
+                variant={activeTab === 'winners' ? 'default' : 'outline'}
+                onClick={() => setActiveTab('winners')}
+                className={activeTab === 'winners' ? 'bg-amber-600' : 'border-gray-700 text-gray-400'}
+              >Winners</Button>
             </div>
             <div className="hidden lg:flex gap-2">
               <Button
@@ -582,6 +716,11 @@ export default function BannerStudio() {
                 onClick={() => setActiveTab('analysis')}
                 className="border-gray-700 text-gray-400 hover:text-white"
               >Analysis</Button>
+              <Button
+                variant="outline"
+                onClick={() => setActiveTab('winners')}
+                className="border-gray-700 text-gray-400 hover:text-white"
+              >Winners</Button>
             </div>
 
             {/* Publish panel - full width two-column layout */}

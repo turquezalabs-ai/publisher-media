@@ -57,3 +57,41 @@ Stage Summary:
 - Client-side date parser handles both MM/DD/YYYY and YYYY-MM-DD formats
 - April 2 & 3 2026 have no data because of holiday (user confirmed)
 
+
+---
+Task ID: 2
+Agent: Main
+Task: Add Daily Winners banner UI access (tab + API route + publish support)
+
+Work Log:
+- Created `src/app/api/daily-winners/route.ts` — API endpoint to render Daily Winners banner on demand
+  - Accepts `?date=YYYY-MM-DD` parameter
+  - Returns server-rendered PNG via `renderDailyWinnersToBuffer()`
+  - Supports `?download=true` for Content-Disposition header
+  - Returns 404 if no draws found for the given date (holiday)
+  - Returns 400 for missing/invalid date parameter
+- Updated `src/app/page.tsx` — Added "Winners" tab (amber color)
+  - Date picker defaults to yesterday (PH time)
+  - "Generate Banner" button calls `/api/daily-winners?date=...`
+  - Server-rendered PNG displayed in preview area (30% scaled)
+  - "Download PNG" button triggers download with proper filename
+  - Error handling for missing data (holidays)
+  - Tab navigation includes Blueprint, Analysis, Winners, and Publish
+  - Publish tab also has "Winners" back-navigation button
+- Updated `src/components/publish/PublishPanel.tsx` — Added Daily Winners support
+  - New "Winners" banner type button (amber theme)
+  - Date picker for selecting which day's results to show
+  - Auto-generates banner when switching to Winners tab
+  - Preview shows server-rendered PNG (not client-side html-to-image)
+  - `captureBannerAsBase64()` updated to handle blob URL → base64 for Daily Winners
+  - Caption auto-generates with date and hashtags for Daily Winners
+  - Badge shows "Auto-generated caption for daily draw results"
+- Fixed duplicate `getBlueprintCaptionCount()` in `src/lib/banner/captions.ts`
+- Build passes cleanly — all routes registered
+
+Stage Summary:
+- New file: `src/app/api/daily-winners/route.ts`
+- Modified: `src/app/page.tsx`, `src/components/publish/PublishPanel.tsx`, `src/lib/banner/captions.ts`
+- User can now access Daily Winners banner via the "Winners" tab in the UI
+- Can pick any date, generate preview, download PNG, and publish to Facebook
+- Auto-posts at 6:30 AM PHT daily via cron (already configured)

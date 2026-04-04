@@ -91,7 +91,7 @@ const PLATFORM_CONFIG: Record<Platform, { icon: string; label: string; color: st
 // CAPTION GENERATION
 // ==========================================
 function buildCaption(
-  bannerType: 'blueprint' | 'analysis',
+  bannerType: 'blueprint' | 'analysis' | 'daily-winners',
   game: string,
   gameName: string,
   blueprintDay: number,
@@ -137,7 +137,7 @@ export default function PublishPanel({
   // ---- State ----
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bannerType, setBannerType] = useState<'blueprint' | 'analysis'>('analysis');
+  const [bannerType, setBannerType] = useState<'blueprint' | 'analysis' | 'daily-winners'>('analysis');
   const [caption, setCaption] = useState('');
   const [scheduleType, setScheduleType] = useState<'now' | 'scheduled'>('now');
   const [scheduledDate, setScheduledDate] = useState('');
@@ -157,7 +157,52 @@ export default function PublishPanel({
   const [addIgUserId, setAddIgUserId] = useState('');
 
   // Ref for the preview's inner div (full 1080x1350 banner for capture)
+  // Daily Winners state
+  const [winnersDate, setWinnersDate] = useState('');
+  const [winnersImageUrl, setWinnersImageUrl] = useState<string | null>(null);
+  const [winnersLoading, setWinnersLoading] = useState(false);
+  const [winnersError, setWinnersError] = useState<string | null>(null);
+
   const publishPreviewRef = useRef<HTMLDivElement>(null);
+
+  // Default winners date to yesterday
+  useEffect(() => {
+    const now = new Date();
+    now.setDate(now.getDate() - 1);
+    const phTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + 3600000 * 8);
+    const yyyy = phTime.getFullYear();
+    const mm = String(phTime.getMonth() + 1).padStart(2, '0');
+    const dd = String(phTime.getDate()).padStart(2, '0');
+    setWinnersDate(`${yyyy}-${mm}-${dd}`);
+  }, []);
+
+  const handleGenerateWinners = useCallback(async () => {
+    if (!winnersDate) return;
+    setWinnersLoading(true);
+    setWinnersError(null);
+    setWinnersImageUrl(null);
+    try {
+      const res = await fetch(`/api/daily-winners?date=${winnersDate}&t=${Date.now()}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: 'Failed to render banner' }));
+        setWinnersError(errData.error || `Error ${res.status}`);
+        return;
+      }
+      const blob = await res.blob();
+      setWinnersImageUrl(URL.createObjectURL(blob));
+    } catch (err) {
+      setWinnersError(err instanceof Error ? err.message : 'Failed to generate banner');
+    } finally {
+      setWinnersLoading(false);
+    }
+  }, [winnersDate]);
+
+  // Auto-generate daily winners when tab switches
+  useEffect(() => {
+    if (bannerType === 'daily-winners' && winnersDate && !winnersImageUrl && !winnersLoading) {
+      handleGenerateWinners();
+    }
+  }, [bannerType, winnersDate, winnersImageUrl, winnersLoading, handleGenerateWinners]);
 
   // Game options (mirrored from page.tsx)
   const gameOptions = [
@@ -205,13 +250,23 @@ export default function PublishPanel({
 
   // ---- Auto-generate caption when banner type or data changes ----
   useEffect(() => {
+    if (bannerType === 'daily-winners') {
+      // Daily winners caption is generated server-side, set a placeholder
+      if (!caption.includes('Daily Winners') && !caption.includes('draw results')) {
+        const dateDisplay = winnersDate ? new Date(winnersDate + 'T00:00:00').toLocaleDateString('en-US', {
+          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+        }) : 'yesterday';
+        setCaption(`PCSO Draw Results — ${dateDisplay}\n\nAll winning numbers from ${dateDisplay}.\n\n#PCSO #LottongPinoy #PCSOResults #LottoResults #DailyWinners`);
+      }
+      return;
+    }
     const game = bannerType === 'blueprint' ? blueprintGame : analysisGame;
     const gameName = GAME_NAMES[game] || game;
     const draw = bannerType === 'analysis' ? analysisDraw : null;
     const gData = bannerType === 'analysis' ? analysisGameData : [];
     // eslint-disable-next-line react-hooks/set-state-in-effect -- derived state synced from parent props
     setCaption(buildCaption(bannerType, game, gameName, blueprintDay, draw, gData));
-  }, [bannerType, blueprintGame, analysisGame, analysisDraw, blueprintDay, analysisGameData]);
+  }, [bannerType, blueprintGame, analysisGame, analysisDraw, blueprintDay, analysisGameData, winnersDate]);
 
   // ---- Auto-select connected accounts ----
   useEffect(() => {
@@ -302,6 +357,23 @@ export default function PublishPanel({
 
   // ---- Capture the banner as base64 ----
   const captureBannerAsBase64 = useCallback(async (): Promise<string | null> => {
+    // Daily Winners: use the server-rendered image directly (blob URL → base64)
+    if (bannerType === 'daily-winners' && winnersImageUrl) {
+      try {
+        const response = await fetch(winnersImageUrl);
+        const blob = await response.blob();
+        return new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(blob);
+        });
+      } catch (err) {
+        console.error('Daily winners image capture failed:', err);
+        return null;
+      }
+    }
+
     const refToCapture = captureBannerRef?.current || captureAnalysisRef?.current || publishPreviewRef.current;
     if (!refToCapture) {
       return null;
@@ -319,7 +391,7 @@ export default function PublishPanel({
       console.error('Banner capture failed:', err);
       return null;
     }
-  }, [captureBannerRef, captureAnalysisRef]);
+  }, [captureBannerRef, captureAnalysisRef, bannerType, winnersImageUrl]);
 
   // ---- Publish via API ----
   const handlePublish = async () => {
@@ -428,7 +500,7 @@ export default function PublishPanel({
   const totalSelected = accounts.filter(a => selectedIds.has(a.id) && a.connected).length;
 
   // ---- Current banner data ----
-  const currentGame = bannerType === 'blueprint' ? blueprintGame : analysisGame;
+  const currentGame = bannerType === 'blueprint' ? blueprintGame : bannerType === 'analysis' ? analysisGame : '';
   const currentGameName = GAME_NAMES[currentGame] || currentGame;
   const gameSelectorValue = currentGame;
 
@@ -460,8 +532,16 @@ export default function PublishPanel({
               >
                 Analysis
               </Button>
+              <Button
+                variant={bannerType === 'daily-winners' ? 'default' : 'outline'}
+                onClick={() => setBannerType('daily-winners')}
+                className={bannerType === 'daily-winners' ? 'bg-amber-600 hover:bg-amber-700' : 'border-gray-700 text-gray-400 hover:text-white'}
+              >
+                Winners
+              </Button>
             </div>
-            {/* Game Selector — lets user pick game directly in Publish panel */}
+            {/* Game Selector — only for Blueprint/Analysis */}
+            {bannerType !== 'daily-winners' && (
             <div>
               <label className="text-gray-400 text-xs font-medium block mb-1.5">
                 Game: <span className="text-white font-bold">{currentGameName}</span>
@@ -482,10 +562,39 @@ export default function PublishPanel({
                 </SelectContent>
               </Select>
             </div>
+            )}
+            {/* Date selector for Daily Winners */}
+            {bannerType === 'daily-winners' && (
+            <div>
+              <label className="text-gray-400 text-xs font-medium block mb-1.5">Date</label>
+              <div className="bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white text-sm">
+                <input
+                  type="date"
+                  value={winnersDate}
+                  onChange={(e) => { setWinnersDate(e.target.value); setWinnersImageUrl(null); }}
+                  className="bg-transparent border-none outline-none text-white w-full [color-scheme:dark]"
+                />
+              </div>
+              <Button
+                onClick={handleGenerateWinners}
+                disabled={!winnersDate || winnersLoading}
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold mt-2"
+              >
+                {winnersLoading ? 'Generating...' : 'Generate Winners Banner'}
+              </Button>
+              {winnersError && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-2 mt-2">
+                  <p className="text-red-400 text-[11px]">{winnersError}</p>
+                </div>
+              )}
+            </div>
+            )}
             <p className="text-gray-500 text-xs">
-              {bannerType === 'blueprint'
-                ? `Blueprint: ${currentGameName} — ${blueprintNumbers.length} numbers`
-                : `Analysis: ${currentGameName} — ${analysisDraw?.combination || 'No draw'}`
+              {bannerType === 'daily-winners'
+                ? `Daily Winners — All draws from ${winnersDate || 'yesterday'}`
+                : bannerType === 'blueprint'
+                  ? `Blueprint: ${currentGameName} — ${blueprintNumbers.length} numbers`
+                  : `Analysis: ${currentGameName} — ${analysisDraw?.combination || 'No draw'}`
               }
             </p>
           </CardContent>
@@ -645,6 +754,13 @@ export default function PublishPanel({
                 </Badge>
               </div>
             )}
+            {bannerType === 'daily-winners' && (
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-amber-400 border-amber-400/30 bg-amber-400/10 text-[10px]">
+                  Auto-generated caption for daily draw results
+                </Badge>
+              </div>
+            )}
             <textarea
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
@@ -774,7 +890,7 @@ export default function PublishPanel({
         <div className="flex items-center gap-2 w-full justify-center">
           <div className="h-px bg-gray-800 flex-1" />
           <span className="text-gray-500 text-xs font-medium uppercase tracking-widest px-4">
-            {bannerType === 'blueprint' ? 'Blueprint Preview' : 'Analysis Preview'}
+            {bannerType === 'daily-winners' ? 'Daily Winners Preview' : bannerType === 'blueprint' ? 'Blueprint Preview' : 'Analysis Preview'}
           </span>
           <div className="h-px bg-gray-800 flex-1" />
         </div>
@@ -794,7 +910,9 @@ export default function PublishPanel({
               ref={publishPreviewRef}
               style={{ transform: 'scale(0.3)', transformOrigin: 'top left', width: 1080, height: 1350 }}
             >
-              {bannerType === 'blueprint' && blueprintNumbers.length > 0 ? (
+              {bannerType === 'daily-winners' && winnersImageUrl ? (
+                <img src={winnersImageUrl} alt="Daily Winners" style={{ width: 1080, height: 1350 }} />
+              ) : bannerType === 'blueprint' && blueprintNumbers.length > 0 ? (
                 <BlueprintBanner game={blueprintGame} numbers={blueprintNumbers} />
               ) : bannerType === 'analysis' && analysisDraw ? (
                 <AnalysisBanner
@@ -805,6 +923,10 @@ export default function PublishPanel({
                   classifiedNumbers={analysisClassified}
                   gameData={analysisGameData}
                 />
+              ) : bannerType === 'daily-winners' && winnersLoading ? (
+                <div style={{ width: 1080, height: 1350, background: '#111E44', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 28 }}>Generating banner...</span>
+                </div>
               ) : (
                 <div style={{ width: 1080, height: 1350, background: '#111E44', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 28 }}>No banner generated</span>
@@ -814,7 +936,7 @@ export default function PublishPanel({
           </div>
         </div>
 
-        <p className="text-gray-600 text-xs">Preview scaled 30% — Captures at full 1080x1350px for publishing</p>
+        <p className="text-gray-600 text-xs">{bannerType === 'daily-winners' ? 'Server-rendered preview — Full 1080x1350px' : 'Preview scaled 30% — Captures at full 1080x1350px for publishing'}</p>
 
         {/* Publish Log */}
         {logs.length > 0 && (
