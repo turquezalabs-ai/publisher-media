@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "mkdir -p $HOME/.local/share/fonts && cp public/banner-assets/fonts/Montserrat-Medium.ttf $HOME/.local/share/fonts/ && fc-cache -f $HOME/.local/share/fonts 2>/dev/null; next build",
+    "build": "mkdir -p $HOME/.local/share/fonts && cp public/banner-assets/fonts/Montserrat-Medium.ttf $HOME/.local/share/fonts/ && fc-cache -f $HOME/.local/share/fonts 2>/dev/null; NEXT_DISABLE_TURBOPACK=1 next build",
     "start": "next start",
     "lint": "eslint .",
     "db:push": "prisma db push",
