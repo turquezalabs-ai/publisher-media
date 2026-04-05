@@ -63,19 +63,6 @@ function getCircleFillAlt(game: string, opacity: number = 0.4): string {
 
 let _montserratB64: string | null = null;
 
-function getMontserratBase64(): string {
-  if (!_montserratB64) {
-    const filePath = path.join(process.cwd(), 'public', 'banner-assets', 'fonts', 'Montserrat-Medium.ttf');
-    _montserratB64 = fs.readFileSync(filePath).toString('base64');
-  }
-  return _montserratB64;
-}
-
-/** SVG <style> block with @font-face for Montserrat */
-function svgFontStyle(): string {
-  const b64 = getMontserratBase64();
-  return `<style>@font-face { font-family: 'Montserrat'; src: url(data:font/ttf;base64,${b64}) format('truetype'); font-weight: 100 900; font-style: normal; }</style>`;
-}
 
 // ==========================================
 // SVG HELPERS
@@ -146,7 +133,6 @@ function buildBlueprintSVG(game: string, gameName: string, numbers: BlueprintNum
   const coldCount = numbers.filter(n => n.category === 'cold').length;
 
   let svg = `<svg width="1080" height="1350" xmlns="http://www.w3.org/2000/svg">`;
-  svg += svgFontStyle();
 
   // Background
   svg += svgRect(0, 0, 1080, 1350, '#111E44');
@@ -290,7 +276,6 @@ function buildAnalysisSVG(
   const patternLineHeight = 65;
 
   let svg = `<svg width="1080" height="1350" xmlns="http://www.w3.org/2000/svg">`;
-  svg += svgFontStyle();
 
   // Background
   svg += svgRect(0, 0, 1080, 1350, '#111E44');
@@ -481,7 +466,7 @@ function buildDailyWinnersSVG(
   const majorFirstRowCSS = majorLabelCSS + majorLabelGap;
 
   let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
-  svg += svgFontStyle();
+
   svg += `<defs><clipPath id="logo-clip"><circle cx="132" cy="132" r="68" /></clipPath></defs>`;
 
   // ---- BACKGROUND ----
