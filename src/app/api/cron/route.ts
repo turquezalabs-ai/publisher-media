@@ -490,7 +490,8 @@ async function publishAnalysis(data: LottoResult[], slot: number): Promise<void>
 
 export async function GET(request: NextRequest) {
   // ---- 1. Verify cron secret ----
-  const authHeader = request.headers.get('authorization');
+    const authHeader = request.headers.get('authorization');
+  const querySecret = new URL(request.url).searchParams.get('secret');
   const cronSecret = process.env.CRON_SECRET;
 
   if (!cronSecret) {
@@ -500,7 +501,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (authHeader !== `Bearer ${cronSecret}`) {
+  if (authHeader !== `Bearer ${cronSecret}` && querySecret !== cronSecret) {
     return NextResponse.json(
       { error: 'Unauthorized. Invalid or missing cron secret.' },
       { status: 401 },
