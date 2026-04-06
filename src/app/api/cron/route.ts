@@ -13,7 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { publishToFacebookWithBuffer } from '@/lib/publish/meta';
+import { publishToFacebookWithBuffer, publishToInstagramWithBuffer } from '@/lib/publish/meta';
 import {
   fetchAndProcessData,
   getDrawOnOrBeforeDate,
@@ -98,6 +98,50 @@ function log(entry: CronLogEntry): void {
   console.log(`[CRON] ${entry.timestamp} | ${entry.type} | ${entry.game} | ${entry.status} | ${entry.message}`);
 }
 
+// ==========================================
+// INSTAGRAM CROSS-POSTING
+// ==========================================
+
+async function crossPostToInstagram(
+  imageBuffer: Buffer,
+  caption: string,
+  type: string,
+  game: string
+): Promise<void> {
+  const token = process.env.META_ACCESS_TOKEN;
+  const pageId = process.env.FACEBOOK_PAGE_ID;
+  const igId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
+
+  if (!token || !pageId || !igId) {
+    log({ timestamp: new Date().toISOString(), type: type as any, game, status: 'skipped', message: 'Instagram credentials missing — skipping cross-post.' });
+    return;
+  }
+
+  try {
+    const result = await publishToInstagramWithBuffer({
+      pageAccessToken: token,
+      pageId,
+      instagramBusinessAccountId: igId,
+      imageBuffer,
+      fileName: `ig-${type}-${game}-${Date.now()}.png`,
+      mimeType: 'image/png',
+      caption,
+    });
+
+    if (result.success) {
+      log({ timestamp: new Date().toISOString(), type: type as any, game, status: 'success', message: `Instagram published! Media ID: ${result.mediaId}` });
+    } else {
+      log({ timestamp: new Date().toISOString(), type: type as any, game, status: 'error', message: `Instagram publish failed: ${result.error}` });
+    }
+  } catch (err) {
+    log({ timestamp: new Date().toISOString(), type: type as any, game, status: 'error', message: `Instagram exception: ${err instanceof Error ? err.message : String(err)}` });
+  }
+}
+
+// ==========================================
+// PUBLISH FUNCTIONS
+// ==========================================
+
 async function publishBlueprint(data: LottoResult[]): Promise<void> {
   const game = getTodayBlueprintGame();
   const dayIndex = getBlueprintDayIndex();
@@ -138,9 +182,10 @@ async function publishBlueprint(data: LottoResult[]): Promise<void> {
     });
 
     if (result.success) {
-      log({ timestamp: new Date().toISOString(), type: 'blueprint', game, status: 'success', message: `Published! Post ID: ${result.postId}`, postId: result.postId });
+      log({ timestamp: new Date().toISOString(), type: 'blueprint', game, status: 'success', message: `Facebook published! Post ID: ${result.postId}`, postId: result.postId });
+      await crossPostToInstagram(imageBuffer, caption, 'blueprint', game);
     } else {
-      log({ timestamp: new Date().toISOString(), type: 'blueprint', game, status: 'error', message: `Publish failed: ${result.error}` });
+      log({ timestamp: new Date().toISOString(), type: 'blueprint', game, status: 'error', message: `Facebook publish failed: ${result.error}` });
     }
   } catch (err) {
     log({ timestamp: new Date().toISOString(), type: 'blueprint', game, status: 'error', message: `Exception: ${err instanceof Error ? err.message : String(err)}` });
@@ -187,9 +232,10 @@ async function publishDailyWinners(data: LottoResult[]): Promise<void> {
     });
 
     if (result.success) {
-      log({ timestamp: new Date().toISOString(), type: 'daily-winners', game: 'all', status: 'success', message: `Published! Post ID: ${result.postId}`, postId: result.postId });
+      log({ timestamp: new Date().toISOString(), type: 'daily-winners', game: 'all', status: 'success', message: `Facebook published! Post ID: ${result.postId}`, postId: result.postId });
+      await crossPostToInstagram(imageBuffer, caption, 'daily-winners', 'all');
     } else {
-      log({ timestamp: new Date().toISOString(), type: 'daily-winners', game: 'all', status: 'error', message: `Publish failed: ${result.error}` });
+      log({ timestamp: new Date().toISOString(), type: 'daily-winners', game: 'all', status: 'error', message: `Facebook publish failed: ${result.error}` });
     }
   } catch (err) {
     log({ timestamp: new Date().toISOString(), type: 'daily-winners', game: 'all', status: 'error', message: `Exception: ${err instanceof Error ? err.message : String(err)}` });
@@ -260,9 +306,10 @@ async function publishAnalysis(data: LottoResult[], slot: number): Promise<void>
     });
 
     if (result.success) {
-      log({ timestamp: new Date().toISOString(), type: 'analysis', game, status: 'success', message: `Published! Post ID: ${result.postId}`, postId: result.postId });
+      log({ timestamp: new Date().toISOString(), type: 'analysis', game, status: 'success', message: `Facebook published! Post ID: ${result.postId}`, postId: result.postId });
+      await crossPostToInstagram(imageBuffer, caption, 'analysis', game);
     } else {
-      log({ timestamp: new Date().toISOString(), type: 'analysis', game, status: 'error', message: `Publish failed: ${result.error}` });
+      log({ timestamp: new Date().toISOString(), type: 'analysis', game, status: 'error', message: `Facebook publish failed: ${result.error}` });
     }
   } catch (err) {
     log({ timestamp: new Date().toISOString(), type: 'analysis', game, status: 'error', message: `Exception: ${err instanceof Error ? err.message : String(err)}` });
