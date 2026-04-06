@@ -343,7 +343,7 @@ export async function fetchAndProcessData(): Promise<{
 
   if (dataSourceUrl && dataSourceUrl.trim().length > 0) {
     try {
-      const response = await fetch(dataSourceUrl, {
+      const response = await fetch(dataSourceUrl + `?_t=${Date.now()}`, {
         headers: {
           'Accept': 'application/json',
           'User-Agent': 'LottongPinoy-Cron/1.0',

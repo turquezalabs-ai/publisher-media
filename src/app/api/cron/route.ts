@@ -1,4 +1,4 @@
-/**
+/** *  - Analysis:  7:30 AM PH with 30-min gaps per game (up to 5 slots)
  * Cron API Route — Auto-Publishing System
  *
  * Triggered by cron every 30 minutes.
@@ -64,6 +64,7 @@ function getAnalysisSlot(): number {
     { targetHour: 8, targetMinute: 0, index: 1 },
     { targetHour: 8, targetMinute: 30, index: 2 },
     { targetHour: 9, targetMinute: 0, index: 3 },
+    { targetHour: 9, targetMinute: 30, index: 4 },
   ];
   for (const slot of slots) {
     const targetTotalMin = slot.targetHour * 60 + slot.targetMinute;
@@ -193,28 +194,36 @@ async function publishBlueprint(data: LottoResult[]): Promise<void> {
 }
 
 async function publishDailyWinners(data: LottoResult[]): Promise<void> {
-  const yesterdayISO = getYesterdayPH();
-  const displayDate = formatDisplayDate(yesterdayISO);
+  // Find latest available date instead of hardcoding yesterday
+  const availableDates = [...new Set(data.map(d => d.date))].sort((a, b) => b.localeCompare(a));
+  const latestDate = availableDates[0];
+  
+  if (!latestDate) {
+    log({ timestamp: new Date().toISOString(), type: 'daily-winners', game: 'all', status: 'skipped', message: 'No data available at all.' });
+    return;
+  }
+
+  const displayDate = formatDisplayDate(latestDate);
 
   log({
     timestamp: new Date().toISOString(),
     type: 'daily-winners',
     game: 'all',
     status: 'success',
-    message: `Starting daily winners publish for ${yesterdayISO}`,
+    message: `Starting daily winners publish for ${latestDate} (latest available)`,
   });
 
   try {
-    const yesterdayDraws = data.filter(d => d.date === yesterdayISO);
+    const latestDraws = data.filter(d => d.date === latestDate);
 
-    if (yesterdayDraws.length === 0) {
-      log({ timestamp: new Date().toISOString(), type: 'daily-winners', game: 'all', status: 'skipped', message: `No draws found for ${yesterdayISO}. Holiday or no data — skipping.` });
+    if (latestDraws.length === 0) {
+      log({ timestamp: new Date().toISOString(), type: 'daily-winners', game: 'all', status: 'skipped', message: `No draws found for ${latestDate}. Skipping.` });
       return;
     }
 
-    const imageBuffer = await renderDailyWinnersToBuffer(displayDate, yesterdayDraws);
-    const majorGames = yesterdayDraws.map(d => d.game).filter(g => ['6/58', '6/55', '6/49', '6/45', '6/42', '6D', '4D'].includes(g));
-    const caption = generateDailyWinnersCaption(yesterdayISO, [...new Set(majorGames)]);
+    const imageBuffer = await renderDailyWinnersToBuffer(displayDate, latestDraws);
+    const majorGames = latestDraws.map(d => d.game).filter(g => ['6/58', '6/55', '6/49', '6/45', '6/42', '6D', '4D'].includes(g));
+    const caption = generateDailyWinnersCaption(latestDate, [...new Set(majorGames)]);
 
     const accessToken = process.env.META_ACCESS_TOKEN;
     if (!accessToken) {
@@ -226,7 +235,7 @@ async function publishDailyWinners(data: LottoResult[]): Promise<void> {
       pageAccessToken: accessToken,
       pageId: FACEBOOK_PAGE_ID,
       imageBuffer,
-      fileName: `daily-winners-${yesterdayISO}-${Date.now()}.png`,
+      fileName: `daily-winners-${latestDate}-${Date.now()}.png`,
       mimeType: 'image/png',
       caption,
     });
