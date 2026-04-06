@@ -507,7 +507,22 @@ export async function GET(request: NextRequest) {
       { status: 401 },
     );
   }
-
+  // ---- 1b. Force mode (bypass time checks) ----
+  const forceType = new URL(request.url).searchParams.get('force');
+  if (forceType === 'blueprint' || forceType === 'daily-winners' || forceType === 'analysis') {
+    const { all: data } = await fetchAndProcessData();
+    if (data.length === 0) {
+      return NextResponse.json({ status: 'error', message: 'No lotto data available.' });
+    }
+    if (forceType === 'blueprint') {
+      await publishBlueprint(data);
+    } else if (forceType === 'daily-winners') {
+      await publishDailyWinners(data);
+    } else if (forceType === 'analysis') {
+      await publishAnalysis(data, 0);
+    }
+    return NextResponse.json({ status: 'forced', type: forceType, phTime: `${hour}:${String(minute).padStart(2, '0')}` });
+  }
   // ---- 2. Determine what to run ----
   const { hour, minute } = getCurrentTimePH();
   const tasks: { type: 'blueprint' | 'analysis' | 'daily-winners'; slot?: number }[] = [];
