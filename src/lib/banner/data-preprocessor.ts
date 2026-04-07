@@ -351,9 +351,15 @@ export async function fetchAndProcessData(): Promise<{
         signal: AbortSignal.timeout(15000),
       });
 
-      if (response.ok) {
+            if (response.ok) {
         const raw = await response.json();
-        return preprocessData(raw);
+        const dataArray = Array.isArray(raw) ? raw : (raw.data || raw.results || []);
+        if (dataArray.length === 0) {
+          console.warn(`[Cron] DATA_SOURCE_URL returned empty or non-array data`);
+        } else {
+          console.log(`[Cron] Fetched ${dataArray.length} records from DATA_SOURCE_URL`);
+        }
+        return preprocessData(dataArray);
       }
 
       console.warn(`[Cron] DATA_SOURCE_URL returned ${response.status}, falling back to local`);
