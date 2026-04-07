@@ -252,10 +252,12 @@ async function publishDailyWinners(data: LottoResult[]): Promise<void> {
 }
 
 async function publishAnalysis(data: LottoResult[], slot: number): Promise<void> {
-  const yesterdayISO = getYesterdayPH();
-  const yesterdayDow = getDayOfWeek(yesterdayISO);
-  const drawnGames = SCHEDULE_MAP[yesterdayDow] || [];
-  const analysisGames = drawnGames.filter(g => AUTO_ANALYSIS_GAMES.includes(g));
+    const yesterdayISO = getYesterdayPH();
+  // Use actual data instead of SCHEDULE_MAP (handles special draw days)
+  const drawnGames = data
+    .filter(d => d.date === yesterdayISO && AUTO_ANALYSIS_GAMES.includes(d.game))
+    .map(d => d.game);
+  const analysisGames = [...new Set(drawnGames)];
 
   if (slot >= analysisGames.length) {
     log({ timestamp: new Date().toISOString(), type: 'analysis', game: `slot-${slot}`, status: 'skipped', message: `Slot ${slot} has no game (only ${analysisGames.length} games drawn yesterday).` });
@@ -354,7 +356,10 @@ export async function GET(request: NextRequest) {
     }
     if (forceType === 'blueprint') await publishBlueprint(data);
     else if (forceType === 'daily-winners') await publishDailyWinners(data);
-    else if (forceType === 'analysis') await publishAnalysis(data, 0);
+        else if (forceType === 'analysis') {
+      const slot = parseInt(new URL(request.url).searchParams.get('slot') || '0', 10);
+      await publishAnalysis(data, slot);
+    }
     return NextResponse.json({ status: 'forced', type: forceType, phTime: `${hour}:${String(minute).padStart(2, '0')}` });
   }
 
