@@ -327,12 +327,39 @@ export function getLatestDrawDate(game: string, data: LottoResult[]): string | n
 }
 
 // ==========================================
+// LOCAL FALLBACK
+// ==========================================
+
+/**
+ * Load and preprocess data from the local results.json file.
+ */
+async function loadLocalData(): Promise<{
+  all: LottoResult[];
+  byGame: Record<string, LottoResult[]>;
+  games: string[];
+}> {
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const filePath = path.join(process.cwd(), 'public', 'results.json');
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    console.log(`[Cron] Loaded ${Array.isArray(raw) ? raw.length : 0} records from local results.json`);
+    return preprocessData(Array.isArray(raw) ? raw : []);
+  } catch (err) {
+    console.error('[Cron] Failed to read local results.json:', err);
+    return { all: [], byGame: {}, games: [] };
+  }
+}
+
+// ==========================================
 // DATA LOADING
 // ==========================================
 
 /**
  * Fetch and preprocess lotto data from the configured source.
  * Tries DATA_SOURCE_URL first, falls back to local results.json.
+ *
+ * FIX: Now properly falls back to local file when URL returns empty data.
  */
 export async function fetchAndProcessData(): Promise<{
   all: LottoResult[];
@@ -343,40 +370,58 @@ export async function fetchAndProcessData(): Promise<{
 
   if (dataSourceUrl && dataSourceUrl.trim().length > 0) {
     try {
-      const response = await fetch(dataSourceUrl + `?_t=${Date.now()}`, {
+      console.log(`[Cron] Fetching from DATA_SOURCE_URL: ${dataSourceUrl}`);
+      const response = await fetch(dataSourceUrl, {
         headers: {
           'Accept': 'application/json',
           'User-Agent': 'LottongPinoy-Cron/1.0',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
         },
         signal: AbortSignal.timeout(15000),
       });
 
-            if (response.ok) {
-        const raw = await response.json();
-        const dataArray = Array.isArray(raw) ? raw : (raw.data || raw.results || []);
-        if (dataArray.length === 0) {
-          console.warn(`[Cron] DATA_SOURCE_URL returned empty or non-array data`);
-        } else {
-          console.log(`[Cron] Fetched ${dataArray.length} records from DATA_SOURCE_URL`);
-        }
-        return preprocessData(dataArray);
+      console.log(`[Cron] Response status: ${response.status} ${response.statusText}`);
+      console.log(`[Cron] Response content-type: ${response.headers.get('content-type')}`);
+
+      if (!response.ok) {
+        console.warn(`[Cron] DATA_SOURCE_URL returned ${response.status}, falling back to local`);
+        return loadLocalData();
       }
 
-      console.warn(`[Cron] DATA_SOURCE_URL returned ${response.status}, falling back to local`);
+      const raw = await response.json();
+      console.log(`[Cron] Raw data type: ${typeof raw}, isArray: ${Array.isArray(raw)}`);
+
+      let dataArray: unknown[];
+
+      if (Array.isArray(raw)) {
+        dataArray = raw;
+      } else if (raw && typeof raw === 'object') {
+        // Log keys for debugging
+        const keys = Object.keys(raw);
+        console.log(`[Cron] Object keys: ${keys.join(', ')}`);
+        dataArray = (raw as Record<string, unknown>).data as unknown[]
+          || (raw as Record<string, unknown>).results as unknown[]
+          || [];
+      } else {
+        dataArray = [];
+      }
+
+      console.log(`[Cron] Extracted array length: ${dataArray.length}`);
+
+      if (dataArray.length === 0) {
+        console.warn(`[Cron] DATA_SOURCE_URL returned empty data, falling back to local`);
+        return loadLocalData();
+      }
+
+      console.log(`[Cron] Fetched ${dataArray.length} records from DATA_SOURCE_URL`);
+      return preprocessData(dataArray);
+
     } catch (err) {
       console.warn(`[Cron] Failed to fetch DATA_SOURCE_URL:`, err);
+      return loadLocalData();
     }
   }
 
-  // Fallback: read local file
-  try {
-    const fs = await import('fs');
-    const path = await import('path');
-    const filePath = path.join(process.cwd(), 'public', 'results.json');
-    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    return preprocessData(raw);
-  } catch (err) {
-    console.error('[Cron] Failed to read local results.json:', err);
-    return { all: [], byGame: {}, games: [] };
-  }
+  // No DATA_SOURCE_URL configured — use local file
+  return loadLocalData();
 }
