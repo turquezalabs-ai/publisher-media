@@ -36,3 +36,11 @@ export interface PatternResult {
   combo: string;
   count: number;
 }
+export interface LottoResult {
+  game: string;
+  combination: string;
+  date: string;
+  prize: string;
+  winners: string;
+  originalGame?: string;  // ← ADD THIS LINE
+}

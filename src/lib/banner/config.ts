@@ -179,3 +179,19 @@ export const DAILY_GAME_LABELS: Record<string, string> = {
   '3D': '3D Swertres',
   '2D': '2D EZ2 Lotto',
 };
+
+// ==========================================
+// PULSE SCHEDULE (2D + 3D Analysis)
+// ==========================================
+// Posts 2D + 3D pattern analysis after each draw time.
+// Draw times: 2PM, 5PM, 9PM PH
+// Post times: 2:15 PM, 5:15 PM, 9:15 PM PH (15 min after draw)
+export const PULSE_POST_TIMES = [
+  { draw: '2PM', postHour: 14, postMinute: 15 },
+  { draw: '5PM', postHour: 17, postMinute: 15 },
+  { draw: '9PM', postHour: 21, postMinute: 15 },
+] as const;
+
+export type PulseTimeSlot = '2PM' | '5PM' | '9PM';
+
+export const PULSE_TIME_SLOTS: PulseTimeSlot[] = ['2PM', '5PM', '9PM'];

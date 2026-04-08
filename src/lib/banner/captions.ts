@@ -327,3 +327,36 @@ export function getBlueprintCaptionCount(): number {
 export function getAnalysisCaptionCount(): number {
   return ANALYSIS_CAPTIONS.length;
 }
+
+// ==========================================
+// PULSE CAPTIONS (8 templates)
+// ==========================================
+const PULSE_CAPTIONS: string[] = [
+  'The latest 2D and 3D patterns are mapped out. Check the winning numbers and emerging trends from today\'s draw.',
+  'Fresh PULSE analysis for today\'s 2D EZ2 and 3D Swertres draws. Which patterns are repeating?',
+  'Today\'s digit game breakdown is here. 2D and 3D winning numbers with pattern insights.',
+  'PULSE check complete! See the latest 2D and 3D results with pattern analysis and hot number tracking.',
+  'The 2D and 3D draws just came in. Here are the numbers and the patterns behind them.',
+  'Quick PULSE scan for today\'s digit games. 2D EZ2 and 3D Swertres results with trend analysis.',
+  'Tracking the patterns in today\'s 2D and 3D draws. Hot numbers and connections mapped.',
+  'Your PULSE analysis is ready. 2D and 3D winning numbers with behavioral insights.',
+];
+
+/**
+ * Generate a PULSE caption for a specific time slot.
+ */
+export function generatePulseCaption(timeSlot: string): string {
+  const templateIndex = Math.floor(Math.random() * PULSE_CAPTIONS.length);
+  const template = PULSE_CAPTIONS[templateIndex];
+
+  const timeLabels: Record<string, string> = {
+    '2PM': 'Alas-Dos (2PM)',
+    '5PM': 'Alas-Singko (5PM)',
+    '9PM': 'Alas-Nwebe (9PM)',
+  };
+  const timeLabel = timeLabels[timeSlot] || timeSlot;
+
+  const hashtags = '#2D #3D #PCSO #LottongPinoy #PulseAnalysis #DigitGames #DataDriven #NumberTrends';
+
+  return `${template}\n\nDraw Time: ${timeLabel}\n\n${hashtags}\n\n18+ only. For educational use only. Not affiliated with PCSO. Always verify results via official PCSO channels.`;
+}

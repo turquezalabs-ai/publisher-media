@@ -22,6 +22,8 @@ import {
   getPreviousDraw,
   generateHumanPatternStatements,
 } from './analysis';
+import { generatePulseAnalysis, getTimeSlotLabel } from './pulse-engine';
+import type { PulseData } from './pulse-engine';
 
 // ==========================================
 // COLOR HELPERS
@@ -189,7 +191,7 @@ function buildBlueprintSVG(game: string, gameName: string, numbers: BlueprintNum
 
   // Legend
   // Legend
-  const legendY = 420;
+  const legendY = 100;
   svg += svgImage(220, legendY -28, 30, 30, getHotEmojiBase64());
   svg += svgText(288, legendY, 'HOT', { size: 26, weight: '600', color: 'white' });
   svg += svgText(270, legendY + 30, '(High occurrence)', { size: 22, weight: '600', color: 'rgba(255,255,255,0.50)' });
@@ -545,7 +547,7 @@ const DAILY_MARGIN_TOP = 20;
   svg += svgText(149, dailyColHdrSVG_Y, '2D EZ2 Lotto', {
     size: 30, weight: '700', color: 'white', anchor: 'start', letterSpacing: 2
   });
-  svg += svgText(584, dailyColHdrSVG_Y, '3D Swertres', {
+  svg += svgText(596, dailyColHdrSVG_Y, '3D Swertres', {
     size: 30, weight: '700', color: 'white', anchor: 'start', letterSpacing: 2
   });
 
@@ -597,7 +599,140 @@ const DAILY_MARGIN_TOP = 20;
   svg += '</svg>';
   return svg;
 }
+// ==========================================
+// PULSE BANNER SVG (2D + 3D Analysis)
+// ==========================================
 
+export function buildPulseSVG(
+  timeSlot: '2PM' | '5PM' | '9PM',
+  dateStr: string,
+  pulseData: PulseData,
+): string {
+  const W = 1080;
+  const H = 1350;
+  const logoB64 = getLogoBase64();
+  const qrB64 = getQRBase64();
+  const d2 = pulseData['2d'];
+  const d3 = pulseData['3d'];
+
+  let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+  svg += svgRect(0, 0, W, H, '#111E44');
+
+  // === HEADER (same as all banners) ===
+  svg += `<defs><clipPath id="logo-clip"><circle cx="132" cy="132" r="68" /></clipPath></defs>`;
+  svg += `<circle cx="132" cy="132" r="68" fill="rgba(255,255,255,0.10)" />`;
+  svg += `<image x="64" y="64" width="136" height="136" href="data:image/png;base64,${logoB64}" clip-path="url(#logo-clip)" preserveAspectRatio="xMidYMid slice" />`;
+  svg += `<image x="880" y="64" width="136" height="136" href="data:image/png;base64,${qrB64}" />`;
+  svg += `<text x="540" y="143" text-anchor="middle" font-family="${FONT}" font-size="68" font-weight="800"><tspan fill="white">Lottong </tspan><tspan fill="#3B82F6">Pinoy</tspan></text>`;
+  svg += svgText(540, 206, 'PULSE ANALYSIS', { size: 28, weight: '700', color: 'rgba(255,255,255,0.80)', letterSpacing: 7 });
+  const timeLabel = getTimeSlotLabel(timeSlot);
+  svg += svgText(540, 255, `${timeLabel} - ${dateStr}`, { size: 28, weight: '700', color: 'white', letterSpacing: 2 });
+
+  // === 2D SECTION ===
+  svg += svgText(540, 370, '2D EZ2 LOTTO', { size: 40, weight: '800', color: 'white' });
+
+  // 2D Last Draw Circles (Blueprint style: radius 58, emoji 46px above)
+  const d2Nums = d2.lastDraw;
+  const d2R = 58;
+  const d2BallSize = d2R * 2;
+  const d2Spacing = 154;
+  const d2TotalW = Math.max(1, d2Nums.length - 1) * d2Spacing + d2BallSize;
+  const d2StartX = Math.round((W - d2TotalW) / 2);
+  const d2CircleTop = 420;
+  const d2EmojiOffX = 13;
+  const d2EmojiOffY = -64;
+  const d2EmojiSize = 46;
+
+  for (let i = 0; i < d2Nums.length; i++) {
+    const cx = d2StartX + d2R + i * d2Spacing;
+    const cy = d2CircleTop + d2R;
+    svg += svgCircle(cx, cy, d2R, 'rgba(220, 38, 38, 0.60)', 'rgba(255,255,255,0.20)', 4);
+    svg += svgText(cx, cy + 12, String(d2Nums[i]).padStart(2, '0'), { size: 35, weight: '700', color: 'white' });
+        const d2Cat = d2.numberCategories[d2Nums[i]] || 'warm';
+    svg += svgImage(cx + d2EmojiOffX, cy + d2EmojiOffY, d2EmojiSize, d2EmojiSize, getCategoryEmojiHref(d2Cat));
+  }
+
+  // 2D Patterns (Analysis style: tip emoji, bold vars)
+  const pattern2StartY = 590;
+  const pattern2LineHeight = 40;
+  for (let i = 0; i < d2.patterns.length; i++) {
+    const py = pattern2StartY + i * pattern2LineHeight;
+    const insight = d2.patterns[i];
+    const boldFill = 'rgba(255, 255, 255, 0.95)';
+    const raw = insight.text;
+    const parts = raw.split(/(\d+)/);
+    let content = '';
+    for (const part of parts) {
+      const num = parseInt(part, 10);
+      if (!isNaN(num) && insight.boldVars.includes(num)) {
+        content += `<tspan font-weight="700" fill="${boldFill}">${escapeXml(part)}</tspan>`;
+      } else if (part) {
+        content += escapeXml(part);
+      }
+    }
+    svg += svgImage(90, py - 22, 26, 26, getTipEmojiBase64());
+    svg += `<text x="130" y="${py}" font-family="${FONT}" font-size="24" font-weight="500" fill="rgba(255,255,255,0.70)" text-anchor="start">${content}</text>`;
+  }
+
+
+  // === 3D SECTION ===
+  svg += svgText(540, 770, '3D SWERTRES LOTTO', { size: 40, weight: '800', color: 'white' });
+
+  // 3D Last Draw Circles (Blueprint style: radius 58, emoji 46px above)
+  const d3Nums = d3.lastDraw;
+  const d3R = 58;
+  const d3BallSize = d3R * 2;
+  const d3Spacing = 154;
+  const d3TotalW = Math.max(1, d3Nums.length - 1) * d3Spacing + d3BallSize;
+  const d3StartX = Math.round((W - d3TotalW) / 2);
+  const d3CircleTop = 815;
+  const d3EmojiOffX = 13;
+  const d3EmojiOffY = -64;
+  const d3EmojiSize = 46;
+
+  for (let i = 0; i < d3Nums.length; i++) {
+    const cx = d3StartX + d3R + i * d3Spacing;
+    const cy = d3CircleTop + d3R;
+    svg += svgCircle(cx, cy, d3R, 'rgba(147, 51, 234, 0.60)', 'rgba(255,255,255,0.20)', 4);
+    svg += svgText(cx, cy + 12, String(d3Nums[i]).padStart(2, '0'), { size: 35, weight: '700', color: 'white' });
+    const d3Cat = d3.numberCategories[d3Nums[i]] || 'warm';
+    svg += svgImage(cx + d3EmojiOffX, cy + d3EmojiOffY, d3EmojiSize, d3EmojiSize, getCategoryEmojiHref(d3Cat));
+  }
+
+  // 3D Patterns (Analysis style: tip emoji, bold vars)
+  const pattern3StartY = 990;
+  const pattern3LineHeight = 40;
+  for (let i = 0; i < d3.patterns.length; i++) {
+    const py = pattern3StartY + i * pattern3LineHeight;
+    const insight = d3.patterns[i];
+    const boldFill = 'rgba(255, 255, 255, 0.95)';
+    const raw = insight.text;
+    const parts = raw.split(/(\d+)/);
+    let content = '';
+    for (const part of parts) {
+      const num = parseInt(part, 10);
+      if (!isNaN(num) && insight.boldVars.includes(num)) {
+        content += `<tspan font-weight="700" fill="${boldFill}">${escapeXml(part)}</tspan>`;
+      } else if (part) {
+        content += escapeXml(part);
+      }
+    }
+    svg += svgImage(90, py - 22, 26, 26, getTipEmojiBase64());
+    svg += `<text x="130" y="${py}" font-family="${FONT}" font-size="24" font-weight="500" fill="rgba(255,255,255,0.70)" text-anchor="start">${content}</text>`;
+  }
+
+  // === FOOTER (same as all banners) ===
+  svg += svgText(540, 1186, '18+ only. For info/educational use. Not affiliated with PCSO;', {
+    size: 22, weight: '500', color: 'rgba(255,255,255,0.50)', letterSpacing: 1.32,
+  });
+  svg += svgText(540, 1214, 'Lottong Pinoy does not facilitate betting. Always verify results', {
+    size: 22, weight: '500', color: 'rgba(255,255,255,0.50)', letterSpacing: 1.32,
+  });
+  svg += svgText(540, 1286, 'lottong-pinoy.com', { size: 28, weight: '700', color: 'white', letterSpacing: 2 });
+
+  svg += '</svg>';
+  return svg;
+}
 // ==========================================
 // MAIN EXPORTS
 // ==========================================
@@ -632,7 +767,6 @@ export async function renderAnalysisToBuffer(
 
 /**
  * Render a Daily Winners banner to a PNG Buffer.
- * Shows all winning numbers from a specific date.
  */
 export async function renderDailyWinnersToBuffer(
   dateStr: string,
@@ -641,7 +775,6 @@ export async function renderDailyWinnersToBuffer(
   const majorDraws: DailyDrawEntry[] = [];
   const dailyDraws: DailyDrawEntry[] = [];
 
-  // Collect major game draws
   for (const game of DAILY_WINNERS_MAJOR_GAMES) {
     const draw = draws.find(d => d.game === game);
     if (draw) {
@@ -656,12 +789,8 @@ export async function renderDailyWinnersToBuffer(
     }
   }
 
-  // Collect daily digit game draws (3D and 2D with time slots)
-  // The preprocessor provides multiple entries per digit game (one per time slot)
-  // Collect all unique draws per game (up to 3 for 2PM/5PM/9PM)
   for (const game of DAILY_WINNERS_DIGIT_GAMES) {
     const gameDraws = draws.filter(d => d.game === game);
-    // Typically there will be 3 entries (2PM, 5PM, 9PM)
     for (let i = 0; i < Math.min(gameDraws.length, 3); i++) {
       const nums = parseCombination(gameDraws[i].combination);
       if (nums.length > 0) {
@@ -676,5 +805,18 @@ export async function renderDailyWinnersToBuffer(
   }
 
   const svg = buildDailyWinnersSVG(dateStr, majorDraws, dailyDraws);
+  return sharp(Buffer.from(svg)).resize(1080, 1350, { fit: 'fill' }).png().toBuffer();
+}
+
+/**
+ * Render a PULSE banner (2D + 3D analysis) to a PNG Buffer.
+ */
+
+export async function renderPulseToBuffer(
+  timeSlot: '2PM' | '5PM' | '9PM',
+  dateStr: string,
+  pulseData: PulseData,
+): Promise<Buffer> {
+  const svg = buildPulseSVG(timeSlot, dateStr, pulseData);
   return sharp(Buffer.from(svg)).resize(1080, 1350, { fit: 'fill' }).png().toBuffer();
 }

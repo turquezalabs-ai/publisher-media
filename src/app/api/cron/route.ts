@@ -37,6 +37,11 @@ import { generateBlueprintNumbers } from '@/lib/banner/analysis';
 import { generateBlueprintCaptionV2, generateAnalysisCaption, generateDailyWinnersCaption } from '@/lib/banner/captions';
 import { renderBlueprintToBuffer, renderAnalysisToBuffer, renderDailyWinnersToBuffer } from '@/lib/banner/server-render';
 import { calculateFrequency, classifyNumbers, parseCombination } from '@/lib/banner/analysis';
+import { fetchPulseData } from '@/lib/banner/pulse-engine';
+import { renderPulseToBuffer } from '@/lib/banner/server-render';
+import { generatePulseCaption } from '@/lib/banner/captions';
+import { PULSE_POST_TIMES } from '@/lib/banner/config';
+import type { PulseTimeSlot } from '@/lib/banner/config';
 import type { LottoResult, NumberData } from '@/lib/banner/types';
 
 const FACEBOOK_PAGE_ID = process.env.FACEBOOK_PAGE_ID || '1498874648244130';
@@ -84,6 +89,15 @@ function isBlueprintTime(): boolean {
 function isDailyWinnersTime(): boolean {
   const { hour, minute } = getCurrentTimePH();
   return hour === 6 && Math.abs(minute - 30) <= 7;
+}
+function getPulseTimeSlot(): PulseTimeSlot | null {
+  const { hour, minute } = getCurrentTimePH();
+  for (const pt of PULSE_POST_TIMES) {
+    if (hour === pt.postHour && Math.abs(minute - pt.postMinute) <= 7) {
+      return pt.draw as PulseTimeSlot;
+    }
+  }
+  return null;
 }
 
 interface CronLogEntry {
@@ -326,7 +340,58 @@ async function publishAnalysis(data: LottoResult[], slot: number): Promise<void>
     log({ timestamp: new Date().toISOString(), type: 'analysis', game, status: 'error', message: `Exception: ${err instanceof Error ? err.message : String(err)}` });
   }
 }
+async function publishPulse(data: LottoResult[], timeSlot: PulseTimeSlot): Promise<void> {
+  log({
+    timestamp: new Date().toISOString(),
+    type: 'daily-winners' as any,
+    game: `pulse-${timeSlot}`,
+    status: 'success',
+    message: `Starting PULSE publish for ${timeSlot}`,
+  });
 
+  try {
+    const pulseData = await fetchPulseData(data, timeSlot);
+    if (!pulseData) {
+      log({ timestamp: new Date().toISOString(), type: 'daily-winners' as any, game: `pulse-${timeSlot}`, status: 'skipped', message: 'No PULSE data available.' });
+      return;
+    }
+
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-US', {
+      timeZone: 'Asia/Manila',
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
+    const imageBuffer = await renderPulseToBuffer(timeSlot, dateStr, pulseData);
+    const caption = generatePulseCaption(timeSlot);
+
+    const accessToken = process.env.META_ACCESS_TOKEN;
+    if (!accessToken) {
+      log({ timestamp: new Date().toISOString(), type: 'daily-winners' as any, game: `pulse-${timeSlot}`, status: 'error', message: 'META_ACCESS_TOKEN not configured' });
+      return;
+    }
+
+    const result = await publishToFacebookWithBuffer({
+      pageAccessToken: accessToken,
+      pageId: FACEBOOK_PAGE_ID,
+      imageBuffer,
+      fileName: `pulse-${timeSlot}-${Date.now()}.png`,
+      mimeType: 'image/png',
+      caption,
+    });
+
+    if (result.success) {
+      log({ timestamp: new Date().toISOString(), type: 'daily-winners' as any, game: `pulse-${timeSlot}`, status: 'success', message: `Facebook PULSE published! Post ID: ${result.postId}`, postId: result.postId });
+    } else {
+      log({ timestamp: new Date().toISOString(), type: 'daily-winners' as any, game: `pulse-${timeSlot}`, status: 'error', message: `Facebook publish failed: ${result.error}` });
+    }
+  } catch (err) {
+    log({ timestamp: new Date().toISOString(), type: 'daily-winners' as any, game: `pulse-${timeSlot}`, status: 'error', message: `Exception: ${err instanceof Error ? err.message : String(err)}` });
+  }
+}
 // ==========================================
 // MAIN CRON HANDLER
 // ==========================================
@@ -349,16 +414,20 @@ export async function GET(request: NextRequest) {
 
   // ---- 1b. Force mode (bypass time checks) ----
   const forceType = new URL(request.url).searchParams.get('force');
-  if (forceType === 'blueprint' || forceType === 'daily-winners' || forceType === 'analysis') {
+    if (forceType === 'blueprint' || forceType === 'daily-winners' || forceType === 'analysis' || forceType === 'pulse') {
     const { all: data } = await fetchAndProcessData();
     if (data.length === 0) {
       return NextResponse.json({ status: 'error', message: 'No lotto data available.' });
     }
     if (forceType === 'blueprint') await publishBlueprint(data);
     else if (forceType === 'daily-winners') await publishDailyWinners(data);
-        else if (forceType === 'analysis') {
+    else if (forceType === 'analysis') {
       const slot = parseInt(new URL(request.url).searchParams.get('slot') || '0', 10);
       await publishAnalysis(data, slot);
+    }
+    else if (forceType === 'pulse') {
+      const slot = (new URL(request.url).searchParams.get('slot') || '2PM') as PulseTimeSlot;
+      await publishPulse(data, slot);
     }
     return NextResponse.json({ status: 'forced', type: forceType, phTime: `${hour}:${String(minute).padStart(2, '0')}` });
   }
@@ -367,6 +436,10 @@ export async function GET(request: NextRequest) {
   const tasks: { type: 'blueprint' | 'analysis' | 'daily-winners'; slot?: number }[] = [];
 
   if (isDailyWinnersTime()) tasks.push({ type: 'daily-winners' });
+    const pulseSlot = getPulseTimeSlot();
+  if (pulseSlot) tasks.push({ type: 'daily-winners' as any, slot: -99 } as any); // handled separately below
+
+  
   if (isBlueprintTime()) tasks.push({ type: 'blueprint' });
 
   const analysisSlot = getAnalysisSlot();
@@ -400,6 +473,11 @@ export async function GET(request: NextRequest) {
     } else if (task.type === 'analysis' && task.slot !== undefined) {
       await publishAnalysis(data, task.slot);
       results.push({ timestamp: new Date().toISOString(), type: 'analysis', game: `slot-${task.slot}`, status: 'success', message: `Analysis slot ${task.slot} executed` });
+    }
+        // PULSE (handled by slot detection, not by task type)
+    if (pulseSlot) {
+      await publishPulse(data, pulseSlot);
+      results.push({ timestamp: new Date().toISOString(), type: 'daily-winners' as any, game: `pulse-${pulseSlot}`, status: 'success', message: `PULSE ${pulseSlot} job executed` });
     }
   }
 

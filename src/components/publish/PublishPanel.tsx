@@ -39,6 +39,7 @@ import {
 import BlueprintBanner from '@/components/banner/BlueprintBanner';
 import AnalysisBanner from '@/components/banner/AnalysisBanner';
 import { toPng } from 'html-to-image';
+import { generatePulseCaption } from '@/lib/banner/captions';
 
 // ==========================================
 // TYPES
@@ -137,7 +138,7 @@ export default function PublishPanel({
   // ---- State ----
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bannerType, setBannerType] = useState<'blueprint' | 'analysis' | 'daily-winners'>('analysis');
+    const [bannerType, setBannerType] = useState<'blueprint' | 'analysis' | 'daily-winners' | 'pulse'>('analysis');
   const [caption, setCaption] = useState('');
   const [scheduleType, setScheduleType] = useState<'now' | 'scheduled'>('now');
   const [scheduledDate, setScheduledDate] = useState('');
@@ -162,6 +163,11 @@ export default function PublishPanel({
   const [winnersImageUrl, setWinnersImageUrl] = useState<string | null>(null);
   const [winnersLoading, setWinnersLoading] = useState(false);
   const [winnersError, setWinnersError] = useState<string | null>(null);
+    // PULSE state
+  const [pulseTimeSlot, setPulseTimeSlot] = useState<'2PM' | '5PM' | '9PM'>('2PM');
+  const [pulseImageUrl, setPulseImageUrl] = useState<string | null>(null);
+  const [pulseLoading, setPulseLoading] = useState(false);
+  const [pulseError, setPulseError] = useState<string | null>(null);
 
   const publishPreviewRef = useRef<HTMLDivElement>(null);
 
@@ -196,6 +202,25 @@ export default function PublishPanel({
       setWinnersLoading(false);
     }
   }, [winnersDate]);
+    const handleGeneratePulse = useCallback(async () => {
+    setPulseLoading(true);
+    setPulseError(null);
+    setPulseImageUrl(null);
+    try {
+      const res = await fetch(`/api/pulse?slot=${pulseTimeSlot}&t=${Date.now()}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: 'Failed to render banner' }));
+        setPulseError(errData.error || `Error ${res.status}`);
+        return;
+      }
+      const blob = await res.blob();
+      setPulseImageUrl(URL.createObjectURL(blob));
+    } catch (err) {
+      setPulseError(err instanceof Error ? err.message : 'Failed to generate banner');
+    } finally {
+      setPulseLoading(false);
+    }
+  }, [pulseTimeSlot]);
 
   // Auto-generate daily winners when tab switches
   useEffect(() => {
@@ -203,6 +228,11 @@ export default function PublishPanel({
       handleGenerateWinners();
     }
   }, [bannerType, winnersDate, winnersImageUrl, winnersLoading, handleGenerateWinners]);
+    useEffect(() => {
+    if (bannerType === 'pulse' && !pulseImageUrl && !pulseLoading) {
+      handleGeneratePulse();
+    }
+  }, [bannerType, pulseImageUrl, pulseLoading, handleGeneratePulse]);
 
   // Game options (mirrored from page.tsx)
   const gameOptions = [
@@ -250,13 +280,18 @@ export default function PublishPanel({
 
   // ---- Auto-generate caption when banner type or data changes ----
   useEffect(() => {
-    if (bannerType === 'daily-winners') {
-      // Daily winners caption is generated server-side, set a placeholder
+        if (bannerType === 'daily-winners') {
       if (!caption.includes('Daily Winners') && !caption.includes('draw results')) {
         const dateDisplay = winnersDate ? new Date(winnersDate + 'T00:00:00').toLocaleDateString('en-US', {
           weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
         }) : 'yesterday';
-        setCaption(`PCSO Draw Results — ${dateDisplay}\n\nAll winning numbers from ${dateDisplay}.\n\n#PCSO #LottongPinoy #PCSOResults #LottoResults #DailyWinners`);
+        setCaption(`PCSO Draw Results \u2014 ${dateDisplay}\n\nAll winning numbers from ${dateDisplay}.\n\n#PCSO #LottongPinoy #PCSOResults #LottoResults #DailyWinners`);
+      }
+      return;
+    }
+    if (bannerType === 'pulse') {
+      if (!caption.includes('PULSE') && !caption.includes('2D')) {
+        setCaption(generatePulseCaption(pulseTimeSlot));
       }
       return;
     }
@@ -358,6 +393,21 @@ export default function PublishPanel({
   // ---- Capture the banner as base64 ----
   const captureBannerAsBase64 = useCallback(async (): Promise<string | null> => {
     // Daily Winners: use the server-rendered image directly (blob URL → base64)
+        if (bannerType === 'pulse' && pulseImageUrl) {
+      try {
+        const response = await fetch(pulseImageUrl);
+        const blob = await response.blob();
+        return new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(blob);
+        });
+      } catch (err) {
+        console.error('PULSE image capture failed:', err);
+        return null;
+      }
+    }
     if (bannerType === 'daily-winners' && winnersImageUrl) {
       try {
         const response = await fetch(winnersImageUrl);
@@ -391,7 +441,7 @@ export default function PublishPanel({
       console.error('Banner capture failed:', err);
       return null;
     }
-  }, [captureBannerRef, captureAnalysisRef, bannerType, winnersImageUrl]);
+    }, [captureBannerRef, captureAnalysisRef, bannerType, winnersImageUrl, pulseImageUrl]);
 
   // ---- Publish via API ----
   const handlePublish = async () => {
@@ -525,6 +575,13 @@ export default function PublishPanel({
                 Blueprint
               </Button>
               <Button
+                variant={bannerType === 'pulse' ? 'default' : 'outline'}
+                onClick={() => setBannerType('pulse')}
+                className={bannerType === 'pulse' ? 'bg-rose-600 hover:bg-rose-700' : 'border-gray-700 text-gray-400 hover:text-white'}
+              >
+                PULSE
+              </Button>
+              <Button
                 variant={bannerType === 'analysis' ? 'default' : 'outline'}
                 onClick={() => setBannerType('analysis')}
                 disabled={!analysisDraw}
@@ -585,6 +642,36 @@ export default function PublishPanel({
               {winnersError && (
                 <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-2 mt-2">
                   <p className="text-red-400 text-[11px]">{winnersError}</p>
+                </div>
+              )}
+            </div>
+            )}
+                        {bannerType === 'pulse' && (
+            <div>
+              <label className="text-gray-400 text-xs font-medium block mb-1.5">Draw Time</label>
+              <Select
+                value={pulseTimeSlot}
+                onValueChange={(v) => { setPulseTimeSlot(v as any); setPulseImageUrl(null); }}
+              >
+                <SelectTrigger className="bg-gray-800 border-gray-700 text-white text-xs h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-800 border-gray-700">
+                  <SelectItem value="2PM" className="text-white focus:bg-gray-700">2PM - Alas-Dos</SelectItem>
+                  <SelectItem value="5PM" className="text-white focus:bg-gray-700">5PM - Alas-Singko</SelectItem>
+                  <SelectItem value="9PM" className="text-white focus:bg-gray-700">9PM - Alas-Nwebe</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={handleGeneratePulse}
+                disabled={pulseLoading}
+                className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold mt-2"
+              >
+                {pulseLoading ? 'Generating...' : 'Generate PULSE Banner'}
+              </Button>
+              {pulseError && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-2 mt-2">
+                  <p className="text-red-400 text-[11px]">{pulseError}</p>
                 </div>
               )}
             </div>
@@ -890,12 +977,12 @@ export default function PublishPanel({
         <div className="flex items-center gap-2 w-full justify-center">
           <div className="h-px bg-gray-800 flex-1" />
           <span className="text-gray-500 text-xs font-medium uppercase tracking-widest px-4">
-            {bannerType === 'daily-winners' ? 'Daily Winners Preview' : bannerType === 'blueprint' ? 'Blueprint Preview' : 'Analysis Preview'}
+                       {bannerType === 'pulse' ? 'PULSE Preview' : bannerType === 'daily-winners' ? 'Daily Winners Preview' : bannerType === 'blueprint' ? 'Blueprint Preview' : 'Analysis Preview'}
           </span>
           <div className="h-px bg-gray-800 flex-1" />
         </div>
 
-        {/* Banner Preview */}
+{/* Banner Preview */}
         <div className="bg-gray-900 rounded-xl p-4 border border-gray-800 shadow-2xl">
           <div
             style={{
@@ -910,7 +997,9 @@ export default function PublishPanel({
               ref={publishPreviewRef}
               style={{ transform: 'scale(0.3)', transformOrigin: 'top left', width: 1080, height: 1350 }}
             >
-              {bannerType === 'daily-winners' && winnersImageUrl ? (
+              {bannerType === 'pulse' && pulseImageUrl ? (
+                <img src={pulseImageUrl} alt="PULSE Analysis" style={{ width: 1080, height: 1350 }} />
+              ) : bannerType === 'daily-winners' && winnersImageUrl ? (
                 <img src={winnersImageUrl} alt="Daily Winners" style={{ width: 1080, height: 1350 }} />
               ) : bannerType === 'blueprint' && blueprintNumbers.length > 0 ? (
                 <BlueprintBanner game={blueprintGame} numbers={blueprintNumbers} />
@@ -926,6 +1015,10 @@ export default function PublishPanel({
               ) : bannerType === 'daily-winners' && winnersLoading ? (
                 <div style={{ width: 1080, height: 1350, background: '#111E44', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 28 }}>Generating banner...</span>
+                </div>
+              ) : bannerType === 'pulse' && pulseLoading ? (
+                <div style={{ width: 1080, height: 1350, background: '#111E44', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 28 }}>Generating PULSE banner...</span>
                 </div>
               ) : (
                 <div style={{ width: 1080, height: 1350, background: '#111E44', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
