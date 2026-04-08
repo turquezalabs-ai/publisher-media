@@ -93,7 +93,7 @@ function isDailyWinnersTime(): boolean {
 function getPulseTimeSlot(): PulseTimeSlot | null {
   const { hour, minute } = getCurrentTimePH();
   for (const pt of PULSE_POST_TIMES) {
-    if (hour === pt.postHour && Math.abs(minute - pt.postMinute) <= 7) {
+    if (hour === pt.postHour && Math.abs(minute - pt.postMinute) <= 5) {
       return pt.draw as PulseTimeSlot;
     }
   }
