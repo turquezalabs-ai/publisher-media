@@ -20,8 +20,8 @@ import type { LottoResult } from './types';
 const GAME_NAME_MAP: Record<string, string> = {
   'Ultra Lotto 6/58': '6/58',
   'Grand Lotto 6/55': '6/55',
-  'Super Lotto 6/49': '6/49',
-  'Mega Lotto 6/45': '6/45',
+  'Superlotto 6/49': '6/49',      // ← fixed (was "Super Lotto 6/49")
+  'Megalotto 6/45': '6/45',        // ← fixed (was "Mega Lotto 6/45")
   'Lotto 6/42': '6/42',
   '6D Lotto': '6D',
   '4D Lotto': '4D',
