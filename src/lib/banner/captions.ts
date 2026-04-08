@@ -356,7 +356,7 @@ export function generatePulseCaption(timeSlot: string): string {
   };
   const timeLabel = timeLabels[timeSlot] || timeSlot;
 
-  const hashtags = '#2D #3D #PCSO #LottongPinoy #PulseAnalysis #DigitGames #DataDriven #NumberTrends';
+    const hashtags = '#2D #EZ2 #3D #Swertres #PCSO #LottongPinoy #PulseAnalysis #DigitGames #DataDriven #NumberTrends';
 
   return `${template}\n\nDraw Time: ${timeLabel}\n\n${hashtags}\n\n18+ only. For educational use only. Not affiliated with PCSO. Always verify results via official PCSO channels.`;
 }
