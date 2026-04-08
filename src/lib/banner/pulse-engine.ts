@@ -144,8 +144,7 @@ export async function fetchPulseData(
   const slot2d = all2d.filter(d => {
     const og = (d as any).originalGame;
     if (og) return og === `2D Lotto ${timeSlot}`;
-    // Fallback: use any 2D data (no time slot info)
-    return true;
+    return false; // Only use time-specific data from scraper
   });
   // If we have multiple draws without time slots, take unique dates
   const seen2dDates = new Set<string>();
@@ -158,7 +157,7 @@ export async function fetchPulseData(
   const slot3d = all3d.filter(d => {
     const og = (d as any).originalGame;
     if (og) return og === `3D Lotto ${timeSlot}`;
-    return true;
+    return false; // Only use time-specific data from scraper
   });
   const seen3dDates = new Set<string>();
   const unique3d = slot3d.filter(d => {
