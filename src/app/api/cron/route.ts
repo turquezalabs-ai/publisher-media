@@ -1,4 +1,4 @@
-/** *  - Analysis:  7:30 AM PH with 30-min gaps per game (up to 5 slots)
+/**
  * Cron API Route — Auto-Publishing System
  *
  * Triggered by cron every 30 minutes.
@@ -7,12 +7,15 @@
  *  - Blueprint: 10:00 AM PH daily
  *  - Analysis:  7:30 AM PH with 30-min gaps per game
  *  - Daily Winners: 6:30 AM PH
+ *  - PULSE: 3PM, 6PM, 10PM PH
  *
  * Security: Requires CRON_SECRET header or query param.
- * Force mode: ?force=blueprint|daily-winners|analysis
+ * Force mode: ?force=blueprint|daily-winners|analysis|pulse
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { join } from 'path';
 import { publishToFacebookWithBuffer, publishToInstagramWithBuffer } from '@/lib/publish/meta';
 import {
   fetchAndProcessData,
@@ -48,6 +51,90 @@ const FACEBOOK_PAGE_ID = process.env.FACEBOOK_PAGE_ID || '1498874648244130';
 const BLUEPRINT_EPOCH = '2026-01-01';
 const AUTO_ANALYSIS_GAMES = ['6/58', '6/55', '6/49', '6/45', '6/42', '6D', '4D'];
 
+// ==========================================
+// DEDUPE SYSTEM — prevents duplicate posts
+// ==========================================
+
+const PUBLISH_LOG_DIR = join(process.cwd(), '.publish-log');
+const PUBLISH_LOG_FILE = join(PUBLISH_LOG_DIR, 'published.json');
+
+interface PublishedRecord {
+  date: string;       // YYYY-MM-DD PH date
+  type: string;       // blueprint, analysis, daily-winners, pulse
+  game: string;       // game key or slot identifier
+  postId?: string;    // FB post ID for reference
+  timestamp: string;  // ISO timestamp
+}
+
+function ensureLogDir(): void {
+  if (!existsSync(PUBLISH_LOG_DIR)) {
+    mkdirSync(PUBLISH_LOG_DIR, { recursive: true });
+  }
+}
+
+function getTodayPH(): string {
+  return new Date().toLocaleDateString('en-US', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).replace(/\//g, '-');
+  // Returns: 04-09-2026 → convert to 2026-04-09
+}
+
+function getTodayPHISO(): string {
+  const parts = getTodayPH().split('-');
+  return `${parts[2]}-${parts[0]}-${parts[1]}`;
+}
+
+function loadPublishedLog(): PublishedRecord[] {
+  ensureLogDir();
+  try {
+    if (existsSync(PUBLISH_LOG_FILE)) {
+      const raw = readFileSync(PUBLISH_LOG_FILE, 'utf-8');
+      return JSON.parse(raw);
+    }
+  } catch (e) {
+    console.error('[CRON] Error reading publish log:', e);
+  }
+  return [];
+}
+
+function savePublishedLog(records: PublishedRecord[]): void {
+  ensureLogDir();
+  try {
+    writeFileSync(PUBLISH_LOG_FILE, JSON.stringify(records, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('[CRON] Error writing publish log:', e);
+  }
+}
+
+function wasPublishedToday(type: string, game: string): boolean {
+  const today = getTodayPHISO();
+  const log = loadPublishedLog();
+  return log.some(r => r.date === today && r.type === type && r.game === game);
+}
+
+function markPublished(type: string, game: string, postId?: string): void {
+  const today = getTodayPHISO();
+  const log = loadPublishedLog();
+  // Remove any existing record for same type+game+date (overwrite)
+  const filtered = log.filter(r => !(r.date === today && r.type === type && r.game === game));
+  filtered.push({
+    date: today,
+    type,
+    game,
+    postId,
+    timestamp: new Date().toISOString(),
+  });
+  savePublishedLog(filtered);
+  console.log(`[CRON] Marked as published: ${type}/${game} on ${today}`);
+}
+
+// ==========================================
+// BLUEPRINT HELPERS
+// ==========================================
+
 function getBlueprintDayIndex(): number {
   const todayPH = new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' });
   const today = new Date(todayPH.split(',')[0]);
@@ -62,6 +149,10 @@ function getTodayBlueprintGame(): string {
   return BLUEPRINT_ROTATION[(day - 1) % BLUEPRINT_ROTATION.length];
 }
 
+// ==========================================
+// TIME CHECKS — narrowed windows (±4 min)
+// ==========================================
+
 function getAnalysisSlot(): number {
   const { hour, minute } = getCurrentTimePH();
   const slots = [
@@ -74,7 +165,7 @@ function getAnalysisSlot(): number {
   for (const slot of slots) {
     const targetTotalMin = slot.targetHour * 60 + slot.targetMinute;
     const currentTotalMin = hour * 60 + minute;
-    if (Math.abs(currentTotalMin - targetTotalMin) <= 7) {
+    if (Math.abs(currentTotalMin - targetTotalMin) <= 4) {
       return slot.index;
     }
   }
@@ -83,26 +174,31 @@ function getAnalysisSlot(): number {
 
 function isBlueprintTime(): boolean {
   const { hour, minute } = getCurrentTimePH();
-  return hour === 10 && Math.abs(minute - 0) <= 7;
+  return hour === 10 && minute >= 0 && minute <= 4;
 }
 
 function isDailyWinnersTime(): boolean {
   const { hour, minute } = getCurrentTimePH();
-  return hour === 6 && Math.abs(minute - 30) <= 7;
+  return hour === 6 && minute >= 30 && minute <= 34;
 }
+
 function getPulseTimeSlot(): PulseTimeSlot | null {
   const { hour, minute } = getCurrentTimePH();
   for (const pt of PULSE_POST_TIMES) {
-    if (hour === pt.postHour && Math.abs(minute - pt.postMinute) <= 5) {
+    if (hour === pt.postHour && minute >= pt.postMinute && minute <= pt.postMinute + 4) {
       return pt.draw as PulseTimeSlot;
     }
   }
   return null;
 }
 
+// ==========================================
+// LOGGING
+// ==========================================
+
 interface CronLogEntry {
   timestamp: string;
-  type: 'blueprint' | 'analysis' | 'daily-winners';
+  type: 'blueprint' | 'analysis' | 'daily-winners' | 'pulse';
   game: string;
   status: 'success' | 'skipped' | 'error';
   message: string;
@@ -154,13 +250,19 @@ async function crossPostToInstagram(
 }
 
 // ==========================================
-// PUBLISH FUNCTIONS
+// PUBLISH FUNCTIONS — with dedupe checks
 // ==========================================
 
 async function publishBlueprint(data: LottoResult[]): Promise<void> {
   const game = getTodayBlueprintGame();
   const dayIndex = getBlueprintDayIndex();
   const gameName = GAME_NAMES[game] || game;
+
+  // DEDUPE CHECK: Already published today?
+  if (wasPublishedToday('blueprint', game)) {
+    log({ timestamp: new Date().toISOString(), type: 'blueprint', game, status: 'skipped', message: `Already published ${gameName} today. Skipping.` });
+    return;
+  }
 
   log({
     timestamp: new Date().toISOString(),
@@ -198,6 +300,7 @@ async function publishBlueprint(data: LottoResult[]): Promise<void> {
 
     if (result.success) {
       log({ timestamp: new Date().toISOString(), type: 'blueprint', game, status: 'success', message: `Facebook published! Post ID: ${result.postId}`, postId: result.postId });
+      markPublished('blueprint', game, result.postId);
       await crossPostToInstagram(imageBuffer, caption, 'blueprint', game);
     } else {
       log({ timestamp: new Date().toISOString(), type: 'blueprint', game, status: 'error', message: `Facebook publish failed: ${result.error}` });
@@ -208,10 +311,15 @@ async function publishBlueprint(data: LottoResult[]): Promise<void> {
 }
 
 async function publishDailyWinners(data: LottoResult[]): Promise<void> {
-  // Find latest available date instead of hardcoding yesterday
+  // DEDUPE CHECK
+  if (wasPublishedToday('daily-winners', 'all')) {
+    log({ timestamp: new Date().toISOString(), type: 'daily-winners', game: 'all', status: 'skipped', message: 'Already published daily winners today. Skipping.' });
+    return;
+  }
+
   const availableDates = [...new Set(data.map(d => d.date))].sort((a, b) => b.localeCompare(a));
   const latestDate = availableDates[0];
-  
+
   if (!latestDate) {
     log({ timestamp: new Date().toISOString(), type: 'daily-winners', game: 'all', status: 'skipped', message: 'No data available at all.' });
     return;
@@ -256,6 +364,7 @@ async function publishDailyWinners(data: LottoResult[]): Promise<void> {
 
     if (result.success) {
       log({ timestamp: new Date().toISOString(), type: 'daily-winners', game: 'all', status: 'success', message: `Facebook published! Post ID: ${result.postId}`, postId: result.postId });
+      markPublished('daily-winners', 'all', result.postId);
       await crossPostToInstagram(imageBuffer, caption, 'daily-winners', 'all');
     } else {
       log({ timestamp: new Date().toISOString(), type: 'daily-winners', game: 'all', status: 'error', message: `Facebook publish failed: ${result.error}` });
@@ -266,8 +375,13 @@ async function publishDailyWinners(data: LottoResult[]): Promise<void> {
 }
 
 async function publishAnalysis(data: LottoResult[], slot: number): Promise<void> {
-    const yesterdayISO = getYesterdayPH();
-  // Use actual data instead of SCHEDULE_MAP (handles special draw days)
+  // DEDUPE CHECK
+  if (wasPublishedToday('analysis', `slot-${slot}`)) {
+    log({ timestamp: new Date().toISOString(), type: 'analysis', game: `slot-${slot}`, status: 'skipped', message: `Already published analysis slot ${slot} today. Skipping.` });
+    return;
+  }
+
+  const yesterdayISO = getYesterdayPH();
   const drawnGames = data
     .filter(d => d.date === yesterdayISO && AUTO_ANALYSIS_GAMES.includes(d.game))
     .map(d => d.game);
@@ -332,6 +446,7 @@ async function publishAnalysis(data: LottoResult[], slot: number): Promise<void>
 
     if (result.success) {
       log({ timestamp: new Date().toISOString(), type: 'analysis', game, status: 'success', message: `Facebook published! Post ID: ${result.postId}`, postId: result.postId });
+      markPublished('analysis', `slot-${slot}`, result.postId);
       await crossPostToInstagram(imageBuffer, caption, 'analysis', game);
     } else {
       log({ timestamp: new Date().toISOString(), type: 'analysis', game, status: 'error', message: `Facebook publish failed: ${result.error}` });
@@ -340,10 +455,17 @@ async function publishAnalysis(data: LottoResult[], slot: number): Promise<void>
     log({ timestamp: new Date().toISOString(), type: 'analysis', game, status: 'error', message: `Exception: ${err instanceof Error ? err.message : String(err)}` });
   }
 }
+
 async function publishPulse(data: LottoResult[], timeSlot: PulseTimeSlot): Promise<void> {
+  // DEDUPE CHECK
+  if (wasPublishedToday('pulse', timeSlot)) {
+    log({ timestamp: new Date().toISOString(), type: 'pulse', game: `pulse-${timeSlot}`, status: 'skipped', message: `Already published PULSE ${timeSlot} today. Skipping.` });
+    return;
+  }
+
   log({
     timestamp: new Date().toISOString(),
-    type: 'daily-winners' as any,
+    type: 'pulse',
     game: `pulse-${timeSlot}`,
     status: 'success',
     message: `Starting PULSE publish for ${timeSlot}`,
@@ -352,7 +474,7 @@ async function publishPulse(data: LottoResult[], timeSlot: PulseTimeSlot): Promi
   try {
     const pulseData = await fetchPulseData(data, timeSlot);
     if (!pulseData) {
-      log({ timestamp: new Date().toISOString(), type: 'daily-winners' as any, game: `pulse-${timeSlot}`, status: 'skipped', message: 'No PULSE data available.' });
+      log({ timestamp: new Date().toISOString(), type: 'pulse', game: `pulse-${timeSlot}`, status: 'skipped', message: 'No PULSE data available.' });
       return;
     }
 
@@ -370,7 +492,7 @@ async function publishPulse(data: LottoResult[], timeSlot: PulseTimeSlot): Promi
 
     const accessToken = process.env.META_ACCESS_TOKEN;
     if (!accessToken) {
-      log({ timestamp: new Date().toISOString(), type: 'daily-winners' as any, game: `pulse-${timeSlot}`, status: 'error', message: 'META_ACCESS_TOKEN not configured' });
+      log({ timestamp: new Date().toISOString(), type: 'pulse', game: `pulse-${timeSlot}`, status: 'error', message: 'META_ACCESS_TOKEN not configured' });
       return;
     }
 
@@ -384,14 +506,16 @@ async function publishPulse(data: LottoResult[], timeSlot: PulseTimeSlot): Promi
     });
 
     if (result.success) {
-      log({ timestamp: new Date().toISOString(), type: 'daily-winners' as any, game: `pulse-${timeSlot}`, status: 'success', message: `Facebook PULSE published! Post ID: ${result.postId}`, postId: result.postId });
+      log({ timestamp: new Date().toISOString(), type: 'pulse', game: `pulse-${timeSlot}`, status: 'success', message: `Facebook PULSE published! Post ID: ${result.postId}`, postId: result.postId });
+      markPublished('pulse', timeSlot, result.postId);
     } else {
-      log({ timestamp: new Date().toISOString(), type: 'daily-winners' as any, game: `pulse-${timeSlot}`, status: 'error', message: `Facebook publish failed: ${result.error}` });
+      log({ timestamp: new Date().toISOString(), type: 'pulse', game: `pulse-${timeSlot}`, status: 'error', message: `Facebook publish failed: ${result.error}` });
     }
   } catch (err) {
-    log({ timestamp: new Date().toISOString(), type: 'daily-winners' as any, game: `pulse-${timeSlot}`, status: 'error', message: `Exception: ${err instanceof Error ? err.message : String(err)}` });
+    log({ timestamp: new Date().toISOString(), type: 'pulse', game: `pulse-${timeSlot}`, status: 'error', message: `Exception: ${err instanceof Error ? err.message : String(err)}` });
   }
 }
+
 // ==========================================
 // MAIN CRON HANDLER
 // ==========================================
@@ -412,9 +536,9 @@ export async function GET(request: NextRequest) {
 
   const { hour, minute } = getCurrentTimePH();
 
-  // ---- 1b. Force mode (bypass time checks) ----
+  // ---- 1b. Force mode (bypass time checks + dedupe) ----
   const forceType = new URL(request.url).searchParams.get('force');
-    if (forceType === 'blueprint' || forceType === 'daily-winners' || forceType === 'analysis' || forceType === 'pulse') {
+  if (forceType === 'blueprint' || forceType === 'daily-winners' || forceType === 'analysis' || forceType === 'pulse') {
     const { all: data } = await fetchAndProcessData();
     if (data.length === 0) {
       return NextResponse.json({ status: 'error', message: 'No lotto data available.' });
@@ -424,8 +548,7 @@ export async function GET(request: NextRequest) {
     else if (forceType === 'analysis') {
       const slot = parseInt(new URL(request.url).searchParams.get('slot') || '0', 10);
       await publishAnalysis(data, slot);
-    }
-    else if (forceType === 'pulse') {
+    } else if (forceType === 'pulse') {
       const slot = (new URL(request.url).searchParams.get('slot') || '2PM') as PulseTimeSlot;
       await publishPulse(data, slot);
     }
@@ -433,17 +556,17 @@ export async function GET(request: NextRequest) {
   }
 
   // ---- 2. Determine what to run ----
-  const tasks: { type: 'blueprint' | 'analysis' | 'daily-winners'; slot?: number }[] = [];
+  const tasks: { type: string; slot?: number; pulseSlot?: PulseTimeSlot | null }[] = [];
 
   if (isDailyWinnersTime()) tasks.push({ type: 'daily-winners' });
-    const pulseSlot = getPulseTimeSlot();
-  if (pulseSlot) tasks.push({ type: 'daily-winners' as any, slot: -99 } as any); // handled separately below
-
-  
   if (isBlueprintTime()) tasks.push({ type: 'blueprint' });
 
   const analysisSlot = getAnalysisSlot();
   if (analysisSlot >= 0) tasks.push({ type: 'analysis', slot: analysisSlot });
+
+  // PULSE — check once, add to tasks
+  const pulseSlot = getPulseTimeSlot();
+  if (pulseSlot) tasks.push({ type: 'pulse', pulseSlot });
 
   if (tasks.length === 0) {
     return NextResponse.json({
@@ -460,7 +583,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ status: 'error', message: 'No lotto data available. Check DATA_SOURCE_URL or public/results.json.' });
   }
 
-  // ---- 4. Execute tasks ----
+  // ---- 4. Execute tasks (each has dedupe built in) ----
   const results: CronLogEntry[] = [];
 
   for (const task of tasks) {
@@ -473,11 +596,9 @@ export async function GET(request: NextRequest) {
     } else if (task.type === 'analysis' && task.slot !== undefined) {
       await publishAnalysis(data, task.slot);
       results.push({ timestamp: new Date().toISOString(), type: 'analysis', game: `slot-${task.slot}`, status: 'success', message: `Analysis slot ${task.slot} executed` });
-    }
-        // PULSE (handled by slot detection, not by task type)
-    if (pulseSlot) {
-      await publishPulse(data, pulseSlot);
-      results.push({ timestamp: new Date().toISOString(), type: 'daily-winners' as any, game: `pulse-${pulseSlot}`, status: 'success', message: `PULSE ${pulseSlot} job executed` });
+    } else if (task.type === 'pulse' && task.pulseSlot) {
+      await publishPulse(data, task.pulseSlot);
+      results.push({ timestamp: new Date().toISOString(), type: 'pulse', game: `pulse-${task.pulseSlot}`, status: 'success', message: `PULSE ${task.pulseSlot} job executed` });
     }
   }
 
