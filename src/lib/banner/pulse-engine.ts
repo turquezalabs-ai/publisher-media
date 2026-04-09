@@ -178,9 +178,15 @@ export async function fetchPulseData(
   const patterns3d = last3dDraw.length === 3 ? generate3DPatterns(last3dDraw, all3d, prev3d) : [];
     const cat3d = last3dDraw.length > 0 ? classifyDrawNumbers(all3d, last3dDraw, 0, 9) : {};
 
+    // Only post if we have actual draw data for this time slot
+  if (last2dDraw.length === 0 && last3dDraw.length === 0) {
+    console.log(`[Pulse] No draw data for ${timeSlot} in temp file. Skipping.`);
+    return null;
+  }
+
   return {
-        '2d': { lastDraw: last2dDraw, patterns: patterns2d, numberCategories: cat2d },
-        '3d': { lastDraw: last3dDraw, patterns: patterns3d, numberCategories: cat3d },
+    '2d': { lastDraw: last2dDraw, patterns: patterns2d, numberCategories: cat2d },
+    '3d': { lastDraw: last3dDraw, patterns: patterns3d, numberCategories: cat3d },
   };
 }
 
