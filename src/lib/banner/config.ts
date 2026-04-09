@@ -187,9 +187,9 @@ export const DAILY_GAME_LABELS: Record<string, string> = {
 // Draw times: 2PM, 5PM, 9PM PH
 // Post times: 2:15 PM, 5:15 PM, 9:15 PM PH (15 min after draw)
 export const PULSE_POST_TIMES = [
-  { draw: '2PM', postHour: 14, postMinute: 25 },
-  { draw: '5PM', postHour: 17, postMinute: 25 },
-  { draw: '9PM', postHour: 21, postMinute: 25 },
+  { draw: '2PM', postHour: 15, postMinute: 0 },
+  { draw: '5PM', postHour: 18, postMinute: 0 },
+  { draw: '9PM', postHour: 22, postMinute: 0 },
 ] as const;
 
 export type PulseTimeSlot = '2PM' | '5PM' | '9PM';
