@@ -191,7 +191,7 @@ function buildBlueprintSVG(game: string, gameName: string, numbers: BlueprintNum
 
   // Legend
   // Legend
-  const legendY = 100;
+  const legendY = 400;
   svg += svgImage(220, legendY -28, 30, 30, getHotEmojiBase64());
   svg += svgText(288, legendY, 'HOT', { size: 26, weight: '600', color: 'white' });
   svg += svgText(270, legendY + 30, '(High occurrence)', { size: 22, weight: '600', color: 'rgba(255,255,255,0.50)' });
