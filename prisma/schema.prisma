@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Game {
+  id          String   @id @default(cuid())
+  name        String
+  shortName   String
+  color       String   @default("#10B981")
+  icon        String   @default("🎯")
+  scheduleDays String   // JSON array of day names: ["Monday","Wednesday","Friday"]
+  jackpot     Float    @default(0)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  banners  BannerTemplate[]
+  blueprints BlueprintEntry[]
+  winners  Winner[]
+}
+
+model BannerTemplate {
+  id          String   @id @default(cuid())
+  gameId      String
+  game        Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  dayOfWeek   String   // "Monday", "Tuesday", etc.
+  templateName String
+  caption     String
+  hashtags    String   @default("")
+  imageData   String?  // Base64 or URL
+  bgColor     String   @default("#1a1a2e")
+  accentColor String   @default("#e94560")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BlueprintEntry {
+  id          String   @id @default(cuid())
+  gameId      String
+  game        Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  scheduledDate String  // ISO date string YYYY-MM-DD
+  scheduledTime String  @default("20:00")
+  dayOfWeek   String   // Derived from scheduledDate
+  platform    String   @default("facebook") // facebook, instagram, twitter
+  caption     String
+  bannerId    String?
+  status      String   @default("draft") // draft, scheduled, published, failed
+  postedAt    DateTime?
+  publishLog  String?  // JSON log for Playwright/Puppeteer
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Winner {
+  id          String   @id @default(cuid())
+  gameId      String
+  game        Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  drawDate    String
+  numbers     String   // JSON array: "[1,2,3,4,5,6]"
+  jackpot     Float?
+  winners     Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model PublishQueue {
+  id          String   @id @default(cuid())
+  blueprintId String
+  status      String   @default("pending") // pending, in_progress, completed, failed
+  platform    String
+  payload     String   // JSON payload for Playwright/Puppeteer script
+  result      String?  // JSON result from posting
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(3)
+  scheduledAt DateTime
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

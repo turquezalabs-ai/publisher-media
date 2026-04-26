@@ -1,0 +1,182 @@
+{
+  "en": {
+    "analysis": {
+      "subtitle": "DRAW ANALYSIS",
+      "sectionBehavior": "Individual behavior of each number",
+      "sectionPatterns": "Patterns and Connections",
+      "hot": "HOT",
+      "hotDesc": "(High Occurrence)",
+      "warm": "WARM",
+      "warmDesc": "(Avg. Occurrence)",
+      "cold": "COLD",
+      "coldDesc": "(Low Occurrence)",
+      "lastSeen": "Last seen",
+      "drawsAgo": "draws ago",
+      "yesterday": "yesterday",
+      "patternPrefix": {
+        "consecutive": "Consecutive pair detected",
+        "duplicate": "Repeated number in combination",
+        "repeat": "Repeat from previous draw",
+        "gap": "Number returned after",
+        "gapSuffix": "draw gap",
+        "sumLow": "Sum range is low at",
+        "sumMid": "Sum range is mid at",
+        "sumHigh": "Sum range is high at",
+        "oddEven": "Odd/Even split",
+        "highLow": "High/Low split",
+        "history": "This combination appeared before on",
+        "neverSeen": "Never appeared in draw history"
+      }
+    },
+    "pulse": {
+      "subtitle": "PULSE ANALYSIS",
+      "section2D": "2D EZ2 LOTTO",
+      "section3D": "3D SWERTRES LOTTO",
+      "lastDraw2D": "Last 2D Draw Result",
+      "lastDraw3D": "Last 3D Draw Result",
+      "hotDigit2D": "Hot digits in 2D",
+      "hotDigit3D": "Hot digits in 3D",
+      "pattern": {
+        "hotStreak": "has appeared in",
+        "consecutiveDraws": "consecutive draws",
+        "mostFrequent": "Most frequent digit is",
+        "timesIn": "times in last",
+        "draws": "draws",
+        "pair": "Frequent pair detected:",
+        "appeared": "appeared",
+        "gap": "hasn't appeared for",
+        "drawsGap": "draws — may return soon",
+        "oddEven": "Odd/Even digit ratio:",
+        "sum": "Sum of digits:",
+        "aboveAvg": "above average",
+        "belowAvg": "below average",
+        "repeat": "Repeat from last draw:",
+        "newDigit": "New digit not seen recently:",
+        "trend": "Trending digits:",
+        "overdue": "Overdue digits:"
+      },
+      "timeSlots": {
+        "2PM": "2:00 PM Draw",
+        "5PM": "5:00 PM Draw",
+        "9PM": "9:00 PM Draw"
+      }
+    },
+    "captions": {
+      "analysis": {
+        "header": "📊 LOTTO DRAW ANALYSIS",
+        "gameResults": "Winning Numbers:",
+        "frequencyNote": "Based on historical draw frequency analysis",
+        "disclaimer": "18+ only. For educational purposes only.",
+        "hashtags": "#LottongPinoy #LottoAnalysis #PCSO"
+      },
+      "pulse": {
+        "header": "⚡ PULSE ANALYSIS",
+        "digitInsights": "Digit game insights based on recent draw patterns",
+        "disclaimer": "18+ only. For educational purposes only.",
+        "hashtags": "#LottongPinoy #PulseAnalysis #PCSO #2D #3D"
+      }
+    },
+    "common": {
+      "hot": "HOT",
+      "warm": "WARM",
+      "cold": "COLD",
+      "blueprint": "DATA-DRIVEN COMBINATIONS",
+      "weeklyBlueprint": "WEEKLY BLUEPRINT",
+      "dailyWinners": "LOTTO DRAW RESULTS",
+      "majorGames": "MAJOR GAMES",
+      "dailyDraws": "DAILY DRAWS",
+      "disclaimer1": "18+ only. For info/educational use. Not affiliated with PCSO;",
+      "disclaimer2": "Lottong Pinoy does not facilitate betting. Always verify results"
+    }
+  },
+  "tl": {
+    "analysis": {
+      "subtitle": "PAGSUSURI SA DROW",
+      "sectionBehavior": "Galawan ng mga numero",
+      "sectionPatterns": "Mga Pattern at Koneksyon",
+      "hot": "HOT",
+      "hotDesc": "(Madalas lumabas)",
+      "warm": "WARM",
+      "warmDesc": "(Karaniwang lumabas)",
+      "cold": "COLD",
+      "coldDesc": "(Bihirang lumabas)",
+      "lastSeen": "Huling lumabas",
+      "drawsAgo": "draws na ang nakalipas",
+      "yesterday": "kagabi",
+      "patternPrefix": {
+        "consecutive": "Nakita na sunod-sunod na pares:",
+        "duplicate": "Naulit na numero sa kombinasyon:",
+        "repeat": "Naulit mula sa nakaraang draw:",
+        "gap": "Lumabas ang numero pagkatapos ng",
+        "gapSuffix": "draw na nabakante",
+        "sumLow": "Mababang kabuuan sa",
+        "sumMid": "Katamtamang kabuuan sa",
+        "sumHigh": "Mataas na kabuuan sa",
+        "oddEven": "Paghahati ng Odd/Even:",
+        "highLow": "Paghahati ng Mataas/Mababa:",
+        "history": "Lumabas na ang kombinasyong ito noong",
+        "neverSeen": "Hindi pa lumalabas sa kasaysayan ng draw"
+      }
+    },
+    "pulse": {
+      "subtitle": "PULSE PAGSUSURI",
+      "section2D": "2D EZ2 LOTTO",
+      "section3D": "3D SWERTRES LOTTO",
+      "lastDraw2D": "Huling Resulta ng 2D",
+      "lastDraw3D": "Huling Resulta ng 3D",
+      "hotDigit2D": "Mainit na digit sa 2D",
+      "hotDigit3D": "Mainit na digit sa 3D",
+      "pattern": {
+        "hotStreak": "lumabas sa",
+        "consecutiveDraws": "Nakita na sunod-sunod na pares:",
+        "mostFrequent": "Pinakamadalas lumabas na digit ay",
+        "timesIn": "beses sa huling",
+        "draws": "draw",
+        "pair": "Lumabas na madalas na pares:",
+        "appeared": "lumabas",
+        "gap": "hindi pa lumalabas sa loob ng",
+        "drawsGap": "draw — maaaring bumalik na",
+        "oddEven": "Odd/Even ratio ng digit:",
+        "sum": "Kabuuan o total ng mga digit:",
+        "aboveAvg": "mas mataas sa average",
+        "belowAvg": "mas mababa sa average",
+        "repeat": "Naulit mula sa huling drow:",
+        "newDigit": "Bagong digit na hindi pa lumabas:",
+        "trend": "Trending na mga digit:",
+        "overdue": "Overdue na mga digit:"
+      },
+      "timeSlots": {
+        "2PM": "2:00 PM Draw",
+        "5PM": "5:00 PM Draw",
+        "9PM": "9:00 PM Draw"
+      }
+    },
+    "captions": {
+      "analysis": {
+        "header": "📊 PAGSUSURI SA DRAW NG LOTTO",
+        "gameResults": "Mga Nanalong Numero:",
+        "frequencyNote": "Batay sa pagsusuri ng dalas na paglabas ng numero sa kasaysayan",
+        "disclaimer": "18+ pataas. Para sa layuning edukasyon lamang.",
+        "hashtags": "#LottongPinoy #LottoAnalysis #PCSO #Pagsusuri"
+      },
+      "pulse": {
+        "header": "⚡ PULSO NG PAGSUSURI",
+        "digitInsights": "Insights sa digit games batay sa kamakailang draw",
+        "disclaimer": "18+ pataas. Para sa layuning edukasyon lamang.",
+        "hashtags": "#LottongPinoy #PulseAnalysis #PCSO #2D #3D"
+      }
+    },
+    "common": {
+      "hot": "MAINIT",
+      "warm": "TINIGIS",
+      "cold": "MALAMIG",
+      "blueprint": "MGA KOMBINASYONG BATAY SA DATA",
+      "weeklyBlueprint": "LINGGONG BLUEPRINT",
+      "dailyWinners": "RESULTA NG DROW NG LOTTO",
+      "majorGames": "MAJOR GAMES",
+      "dailyDraws": "ARAW-ARAW NA DRAW",
+      "disclaimer1": "18+ only. For info/educational use. Not affiliated with PCSO;",
+      "disclaimer2": "Lottong Pinoy does not facilitate betting. Always verify results"
+    }
+  }
+}
